@@ -1,13 +1,6 @@
 import psycopg2
 import config
 
-# Delete dialogue history from these models
-LIST_OF_FREE_MODELS = [
-    "free_4",
-    "gemini-pro",
-    "f_txt_img"
-]
-
 
 class Database:
     def __init__(self):
@@ -111,77 +104,6 @@ class Database:
         self.set_user_attribute(user_tg_id = user_tg_id, key="msg_id_with_kb", value = msg_id_with_kb)
         self.set_user_attribute(user_tg_id = user_tg_id, key = "current_dialog_id", value = dialogue_id)
     
-    
-    # Reset user dialog settings
-    def end_dialog(self, user_tg_id: int) -> None:
-        # Get current dialogue ID
-        current_dialog_id = self.get_attribute(from_ = "users", select = "current_dialog_id", value = user_tg_id)
-        
-        if current_dialog_id==-1:
-            return
-        
-        model = self.get_attribute(from_ = "dialogues", select = "model", where='id', value = current_dialog_id)
-        
-        # delete messages for free models
-        if model.lower() in LIST_OF_FREE_MODELS:
-            with self.conn.cursor() as cursor:
-                # First delete from messages are tables are related
-                cursor.execute(f"""DELETE FROM messages WHERE dialog_id = {current_dialog_id};""")
-                cursor.execute(f"""DELETE FROM dialogues WHERE id = {current_dialog_id};""")
-        
-        # Update user's table to have 
-        self.set_user_attribute(user_tg_id = user_tg_id, key = "current_dialog_id", value = -1)
-
-    
-    # After the full responce is generated, trigger this function to update n_tokens_used and balance
-    def update_n_used_tokens_and_balance_USD(self, user_tg_id: int, current_model_as_in_keyboard: str, n_input_tokens: int, n_output_tokens: int, current_dialog_id:int, current_model: str) -> None:
-        old_balance =  self.get_attribute(from_ = "users",  value = user_tg_id, select = "balance_usd")
-        
-        # Gets input and output token prices for a specific model
-        input_token_price, output_token_price = self.get_openai_prices_per_token_by_model(current_model_as_in_keyboard)
-        
-        # Price of usage
-        price_of_tokens_used = n_input_tokens * input_token_price + n_output_tokens*output_token_price
-        new_balance = old_balance - price_of_tokens_used
-        self.set_user_attribute(user_tg_id = user_tg_id, key = "balance_usd",  value = new_balance)
-        
-        # Logg usage values
-        with self.conn.cursor() as cursor:
-            cursor.execute(f"INSERT INTO paid_models_usage(tg_id, n_input_tokens_used, n_output_tokens_used, dialog_id, model, price) VALUES (%s, %s, %s, %s, %s, %s);", (user_tg_id, n_input_tokens, n_output_tokens, current_dialog_id, current_model, price_of_tokens_used))
-        
-        return new_balance
-
-
-    # Gets a dict of all messages with a given dialog_id
-    def get_dialog_messages(self, current_dialog_id = None, user_tg_id = None) -> list:
-        
-        # Is user is passed -> we do not know the current_dialog_id. Need 1 more request
-        if user_tg_id != None:
-            current_dialog_id = self.get_attribute(from_ = "users", select = "current_dialog_id", value = user_tg_id)
-        
-        with self.conn.cursor() as cursor:
-            cursor.execute(f"""SELECT user_message, bot_message, date FROM messages WHERE dialog_id = {current_dialog_id};""")
-            messages = cursor.fetchall()
-        
-        return [{'user': user, 'bot': bot, 'date': date.replace(tzinfo=None)} for user, bot, date in messages]
-
-    
-    def add_message_to_dialogue(self, current_dialog_id: int, user_message: str, bot_message: str) -> None:
-        with self.conn.cursor() as cursor:
-            cursor.execute(
-                        f"""INSERT INTO messages(
-                        dialog_id,
-                        user_message,
-                        bot_message
-                    ) VALUES ({current_dialog_id}, '{valid_text(user_message)}', '{valid_text(bot_message)}');""")
-    
-    def delete_last_answer_from_current_dialogue(self, user_tg_id: int):
-        # Get current_dialog_id
-        current_dialog_id = self.get_attribute(from_ = "users", value = user_tg_id, select = "current_dialog_id")
-        
-        with self.conn.cursor() as cursor:
-            cursor.execute(f"""DELETE FROM messages WHERE id = (SELECT id FROM messages WHERE dialog_id = {current_dialog_id} ORDER BY date DESC LIMIT 1);""")
-
     
     def get_exhange_rate_USD_RUB(self):
         with self.conn.cursor() as cursor:
