@@ -29,7 +29,8 @@ if __name__ == "__main__":
 
     cursor.execute(
         """CREATE TABLE IF NOT EXISTS goods (
-                name TEXT PRIMARY KEY,
+                full_name TEXT PRIMARY KEY,
+                model TEXT NOT NULL,
                 description TEXT NOT NULL,
                 quantity_in_stock INTEGER DEFAULT 0 NOT NULL,
                 price_RUB INTEGER DEFAULT 0 NOT NULL
@@ -37,14 +38,10 @@ if __name__ == "__main__":
 
     cursor.execute(
         """CREATE TABLE IF NOT EXISTS goods_photos (
-                goods_name TEXT NOT NULL,
-                photo BYTEA NOT NULL,
-                FOREIGN KEY (goods_name) REFERENCES goods(name) ON DELETE CASCADE
+                model TEXT PRIMARY KEY,
+                photo BYTEA NOT NULL
                 );""")
-
-    cursor.execute(
-        """CREATE INDEX IF NOT EXISTS idx_goods_photos_goods_name ON goods_photos(goods_name);""")
-
+    
 
     cursor.execute(
         """CREATE TABLE IF NOT EXISTS exchange_rates(
