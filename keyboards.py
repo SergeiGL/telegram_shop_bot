@@ -8,15 +8,16 @@ from json import dumps
 
 
 
-def start_menu(balance_USD: float):
+def start_menu():
     keyboard = [
             [
-                InlineKeyboardButton("Choose AI model", callback_data=dumps({"from": "main_menu", "to": "choose_model"})), 
+                InlineKeyboardButton("Товар в Наличии", callback_data=dumps({"from": "menu", "to": "stock"})), 
             ],
             [
-                # InlineKeyboardButton("Инфо",  web_app=telegram.WebAppInfo(url="https://sergeigl.github.io/")), 
-                InlineKeyboardButton(f"${balance_USD:.1f}", callback_data=dumps({"from": "main_menu", "to": "balance"})),
-                InlineKeyboardButton("Support",  url='t.me/GPT_instant_bot_support'),
+                InlineKeyboardButton("Товар под Заказ", callback_data=dumps({"from": "menu", "to": "order"})),
+            ],
+            [
+                InlineKeyboardButton("Support",  url='t.me/best_tech_price'),
             ]
         ]
     

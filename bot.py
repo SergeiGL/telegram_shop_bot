@@ -2,10 +2,7 @@ import asyncio
 import json
 from os import path
 import traceback
-import plisio
 import requests
-import hmac
-import hashlib
 
 from telegram import (
     Update,
@@ -28,21 +25,13 @@ from telegram.ext import (
 )
 
 import database
-
-import g4f_connector
-import gemini_connector
-import openai_connector
-
 import keyboards as kb
 
 import config
 
 
-
-
-
-import time
 def timing_wrapper(func):
+    import time
     def wrapper(*args, **kwargs):
         start = time.time()
         result = func(*args, **kwargs)
@@ -58,31 +47,25 @@ def timing_wrapper(func):
 
 
 
+async def try_msg_delete(chat_id, message_id, context):
+    try:
+        await context.bot.delete_message(chat_id=chat_id, message_id = message_id)
+        return True
+    except: return False
 
 
-async def prev_msg_answered(user_id: int, context: CallbackContext, chat_id: int):    
-    return db.get_attribute(select="prev_msg_answered", from_='users', value=user_id)
-
-@timing_wrapper
 async def db_msg_delete(what_to_delete, user_id, chat_id, context):
     msg_id_to_delete = db.get_attribute(from_="users", value=user_id, select = what_to_delete)
     
     if msg_id_to_delete != -1:
-        await delete_message(chat_id, msg_id_to_delete, context)
-        db.set_user_attribute(user_tg_id = user_id, key = what_to_delete, value = -1)
+        if await try_msg_delete(chat_id, msg_id_to_delete, context): db.set_user_attribute(user_tg_id = user_id, key = what_to_delete, value = -1)
 
 
-async def delete_message(chat_id, message_id, context):
-    try:
-        await context.bot.delete_message(chat_id=chat_id, message_id = message_id)
-    except: pass
-
-async def register_user_if_not_exist(update: Update, context: CallbackContext, user, user_id: int, chat_id: int):
-    if not db.is_user_exist(user_tg_id = user_id, raise_exception=False):
-        db.add_new_user(
-            user_tg_id = user_id,
-            chat_id = chat_id,
-            username=user.username or "Unknown")
+async def register_user_if_not_exist(user, user_id: int, chat_id: int):
+    db.add_new_user_if_not_exist(
+        user_tg_id = user_id,
+        chat_id = chat_id,
+        username=user.username or "Unknown")
 
 
 # /start special entry function
@@ -94,31 +77,16 @@ async def start_handle(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
     
-    await db_msg_delete("msg_id_with_kb", user_id, chat_id, context)
-    await db_msg_delete("start_dialogue_msg_id", user_id, chat_id, context)
-    await db_msg_delete("invoice_msg_id", user_id, chat_id, context)
-    await delete_message(chat_id=chat_id, message_id = update.message.id, context=context)
+    await try_msg_delete(chat_id=chat_id, message_id = update.message.id, context=context)
 
-    db.end_dialog(user_tg_id=user_id)
-    
-    if db.is_user_exist(user_tg_id = user_id, raise_exception=False):
-        db.set_user_attribute(user_tg_id = user_id, key = "prev_msg_answered", value = False)
-        start_wait_text = await context.bot.send_message(chat_id=chat_id, text=START_WAIT_TEXT.format(config.start_wait_time))
-        db.set_user_attribute(user_tg_id = user_id, key="start_dialogue_msg_id", value = start_wait_text.id)
-        await asyncio.sleep(config.start_wait_time)
-        db.set_user_attribute(user_tg_id = user_id, key = "prev_msg_answered", value = True)    
-    else:
-        await register_user_if_not_exist(update, context, user = update.effective_user , user_id = user_id, chat_id=chat_id)
-    
+    await register_user_if_not_exist(user = update.effective_user , user_id = user_id, chat_id=chat_id)
     
     await db_msg_delete("msg_id_with_kb", user_id, chat_id, context)
-    await db_msg_delete("start_dialogue_msg_id", user_id, chat_id, context)
-    
     
     msg = await context.bot.send_photo(
                                 chat_id=chat_id,
-                                photo=PATH_TO_MAIN_MENU_PICTURE,
-                                reply_markup= kb.start_menu(db.get_balance_USD(user_id)),
+                                photo=PATH_TO_MENU_PICTURE,
+                                reply_markup= kb.start_menu(),
                                 disable_notification=True,
                             )
     db.set_user_attribute(user_tg_id=user_id, key = "msg_id_with_kb", value = msg.id) # sets last message with kb
@@ -131,95 +99,18 @@ async def back_to_main_menu(update: Update, context: CallbackContext, user_id: i
     if update is None:
         return
     
-    if not await prev_msg_answered(user_id = user_id, context = context, chat_id = chat_id):
-        return
-    
     # Remove keyboard
     try:
         await context.bot.edit_message_reply_markup(chat_id=chat_id, message_id = db.get_attribute(from_="users", value=user_id, select = "msg_id_with_kb"))
     except: pass
     
-    await db_msg_delete("start_dialogue_msg_id", user_id, chat_id, context)
-    await db_msg_delete("invoice_msg_id", user_id, chat_id, context)
-    
-    db.end_dialog(user_tg_id=user_id)
-    
     msg = await context.bot.send_photo(
         chat_id=chat_id,
-        photo=PATH_TO_MAIN_MENU_PICTURE,
+        photo=PATH_TO_MENU_PICTURE,
         reply_markup = kb.start_menu(db.get_balance_USD(user_id)),
         disable_notification=True,
     )
     db.set_user_attribute(user_tg_id=user_id, key = "msg_id_with_kb", value = msg.id) # sets last message with kb
-
-
-
-async def invoice_handler(update: Update, context: CallbackContext) -> None:
-    if update is None:
-        return
-    
-    user_id = update.effective_user.id
-    chat_id = update.effective_chat.id
-    
-    if not await prev_msg_answered(user_id = user_id, context = context, chat_id = chat_id):
-        await delete_message(chat_id=chat_id, message_id = update.message.id, context=context)
-        return
-    
-    msg_id_with_kb = db.get_attribute(from_="users", value=user_id, select = "msg_id_with_kb")
-    if db.get_attribute(from_ = "users", value=user_id, select="current_dialog_id") == -1:
-        await delete_message(chat_id=chat_id, message_id = msg_id_with_kb, context=context)
-    else:
-        try: await context.bot.edit_message_reply_markup(chat_id = chat_id, message_id=msg_id_with_kb, reply_markup=None)
-        except: pass
-    
-    await db_msg_delete("start_dialogue_msg_id", user_id, chat_id, context)
-    await db_msg_delete("invoice_msg_id", user_id, chat_id, context)
-    
-    
-    # delete /pay 10 text itself
-    await delete_message(chat_id=chat_id, message_id = update.message.id, context=context)
-    
-    data = update.message.text.strip().split()  # ['/pay', '10']
-    
-    try:
-        user_amount = float(data[1])
-        if user_amount <= config.payments_MIN_INVOICE_USDT or data[0] != '/pay' or len(data)!=2:
-            raise ValueError(data)
-        if user_amount == int(user_amount):
-            user_amount = int(user_amount)
-    except:
-        error_msg = await context.bot.send_message(chat_id=chat_id, text=INVALID_USAGE_OF_PAY_TEXT)
-        db.set_user_attribute(user_tg_id=user_id, key = "invoice_msg_id", value = error_msg.id)
-        return
-    
-    # Generate the request signature
-    sign_data = config.payments_CURRENCY + str(user_amount) + config.payments_HEADER + config.payments_DESCRIPTION
-    signature = hmac.new(bytes(config.payments_API_KEY, 'utf-8'), bytes(sign_data, 'utf-8'), hashlib.sha256).hexdigest()
-
-    payload = {
-        "payment_currencies": config.payments_PAYMENT_CURRENCIES,
-        "currency": config.payments_CURRENCY,
-        "amount": user_amount,
-        "description": config.payments_DESCRIPTION,
-        "header": config.payments_HEADER,
-        "payer": config.payments_PAYER,
-        "is_convert_payments": config.payments_IS_CONVERT_PAYMENTS,
-        "data": config.payments_DATA,
-        "sign": signature
-    }
-    
-    response = requests.post(config.payments_URL, headers=config.payments_headers, data=json.dumps(payload))
-    
-    if response.status_code == 200:
-        reply = response.json()
-        if reply["result"] == 'success':
-            db.create_invoice(user_tg_id = user_id, invoice_id=reply["id"], amount = user_amount, currency= config.payments_CURRENCY)
-            invoice_msg = await context.bot.send_message(chat_id=chat_id, text=INVOICE_MSG_TEXT.format(user_amount), reply_markup = kb.payment_button(payment_link = reply["link"]))
-            db.set_user_attribute(user_tg_id=user_id, key = "invoice_msg_id", value = invoice_msg.id)
-            return
-    
-    db.insert_error(response.text)
-    await start_handle(update, context)
 
 
 
@@ -239,14 +130,7 @@ async def button_callback_handler(update: Update, context: CallbackContext) -> N
     
     from_ = callback["from"]
     to_ = callback.get("to")
-    model_ = callback.get("model")
     
-    # If responce is awaited do not answer
-    if not await prev_msg_answered(user_id = user_id, context = context, chat_id = chat_id):
-        return
-    
-    await db_msg_delete("start_dialogue_msg_id", user_id, chat_id, context)
-    await db_msg_delete("invoice_msg_id", user_id, chat_id, context)
     
     if to_ == "balance":
         msg = await context.bot.send_message(chat_id = chat_id, text = HOW_TO_TOP_UP_TEXT)
@@ -259,14 +143,14 @@ async def button_callback_handler(update: Update, context: CallbackContext) -> N
     # to MAIN MENU
     elif to_ == "main_menu":
         if from_ == "ch_m":
-            await query.edit_message_media(media=MAIN_MENU_PICTURE, reply_markup= kb.start_menu(db.get_balance_USD(user_id)))  # edit does not change the message_id -> no need to change message_id_with_kb
+            await query.edit_message_media(media=MENU_PICTURE, reply_markup= kb.start_menu(db.get_balance_USD(user_id)))  # edit does not change the message_id -> no need to change message_id_with_kb
         elif from_ == "gpt_resp":
             await query.edit_message_reply_markup(reply_markup=None)
             # Back to main menu ends dialog automatically
             await back_to_main_menu(update = update, context = context, user_id=user_id, chat_id=chat_id)
         elif from_ == "payment_button":
             # delete original message
-            await delete_message(chat_id=chat_id, message_id = query.message.message_id, context=context)
+            await try_msg_delete(chat_id=chat_id, message_id = query.message.message_id, context=context)
             await back_to_main_menu(update = update, context = context, user_id=user_id, chat_id=chat_id)
         else:
             raise ValueError(f"Unknown from_ {from_} to_ = {to_}")
@@ -274,7 +158,7 @@ async def button_callback_handler(update: Update, context: CallbackContext) -> N
     # from CHOOSE MODEL to CHAT with GPT
     elif from_== "ch_m" and model_ in ["free_GPT", "oai_4_t"]:
         # Delete CHOOSE MODEL menu
-        await delete_message(chat_id=chat_id, message_id = query.message.message_id, context=context)
+        await try_msg_delete(chat_id=chat_id, message_id = query.message.message_id, context=context)
 
         chat_msg_with_kb = await context.bot.send_message(
                             chat_id = chat_id, 
@@ -339,7 +223,7 @@ async def message_handle(update: Update, context: CallbackContext, message=None)
     
     # Check is the prevoius dialog message is answered if not-delete message from the user
     if not await prev_msg_answered(user_id = user_id, context = context, chat_id = chat_id):
-        await delete_message(chat_id=chat_id, message_id = update.message.id, context=context)
+        await try_msg_delete(chat_id=chat_id, message_id = update.message.id, context=context)
         return
     
     # Check that message is not empty    
@@ -351,7 +235,7 @@ async def message_handle(update: Update, context: CallbackContext, message=None)
     # Check for the right mode    
     current_dialog_id = db.get_attribute(from_ = "users", value=user_id, select="current_dialog_id")
     if current_dialog_id == -1: # current_dialog_id = -1 if end_dialog() was triggered
-        await delete_message(chat_id=chat_id, message_id = update.message.id, context=context)
+        await try_msg_delete(chat_id=chat_id, message_id = update.message.id, context=context)
         return
     
     current_model = db.get_attribute(from_ = "dialogues", select="model", where='id', value = current_dialog_id)
@@ -535,14 +419,8 @@ def run_bot() -> None:
 
 
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handle))
-
-
     application.add_handler(CommandHandler("start", start_handle))
-    application.add_handler(CommandHandler("pay", invoice_handler))
-
     application.add_handler(CallbackQueryHandler(button_callback_handler))
-    
-    
     application.add_error_handler(error_handle)
 
 
@@ -568,31 +446,11 @@ get_user_friendly_model_name = {
 
 
 
-NOT_ENOUGH_MONEY_MESSAGE = "На Вашем счёте {} RUB что не достаточно для начала нового диалога.\nПополните баланс."
-START_CHAT_MESSAGE = "New Chat has been started!\nHello, I am the {} model!\nAsk me whatever you want on any language!\n(type the question in the chat)"
-NO_DIALOGUE_MESSAGE = "You have not started any dialogue yet🤷‍♂️\nType your question in the chat!"
-WAIT_FOR_PREV_QUESTION_TO_ANSWER_MESSAGE = "Wait for an answer ⏳"
-NO_MESSAGE_MESSAGE = "Your message is empty 🥲"
-WRONG_CURRENCY_MESSAGE = "Ваша валюта оплаты ({}) не Российский RUB.\nНапишите в поддержку и мы вам поможем!"
-FAIL_TO_GENERATE_RESP_MESSAGE = "Something went wrong 🥲\nPlease try again or contact the Support."
-FREE_GPT_PLACEHOLDER_MESSAGE = "Wait for the answer.\nThank you for your patience..."
-FREE_TEXT_TO_IMG_PLACEHOLDER_MESSAGE = "Please hold on for the image.\nIn the absence of traffic, it should arrive in about 20 seconds.\nWe appreciate your patience."
-PAID_MODELS_PLACEHOLDER_MESSAGE_TEXT = "(Для экономии баланса чаще нажимайте кнопку 'Новый чат'.\nОна сбрасывает контекст, уменьшая ваш вопрос (контекст считается как чать вопроса))\n..."
-SERVERS_ARE_BUSY_TEXT = "Currently, we're facing increased traffic.\nPlease click 'Regenerate' to check if the server is available."
-START_WAIT_TEXT = "The /start command has been activated (likely due to the internal error).\nThe bot will be reset to get rid of errors.\nPlease wait for {} seconds.\nThank you!"
-HOW_TO_TOP_UP_TEXT = "To add funds to your account, use the /pay command followed by the amount in USD.\nFor instance, /pay 10 will generate an invoice for $10.\nIf you lack cryptocurrency but wish to top up, write to Support."
-INVALID_USAGE_OF_PAY_TEXT = "You have used /pay command incorrectly.\nMin. top-up is $4.\nAn example how to top up by $10:\n/pay 10"
-INVOICE_MSG_TEXT = "Your invoice for ${}"
+PATH_TO_MENU_PICTURE = path.join("assets", "menu.png")
+MENU_PICTURE = InputMediaPhoto(media=open(PATH_TO_MENU_PICTURE, 'rb'))
 
-PATH_TO_MAIN_MENU_PICTURE = path.join("assets", "main_menu.png")
-MAIN_MENU_PICTURE = InputMediaPhoto(media=open(PATH_TO_MAIN_MENU_PICTURE, 'rb'))
-
-PATH_TO_CHOOSE_MODEL_PICTURE = path.join("assets", "choose_model.png")
-CHOOSE_MODEL_PICTURE = InputMediaPhoto(media=open(PATH_TO_CHOOSE_MODEL_PICTURE, 'rb'))
 
 
 db = database.Database()
-client = plisio.PlisioAioClient(api_key=config.pliso_api_secret)
-
 if __name__ == "__main__":
     run_bot()
