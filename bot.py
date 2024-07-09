@@ -124,7 +124,7 @@ async def button_callback_handler(update: Update, context: CallbackContext) -> N
             chat_id=chat_id,
             photo=good_photo,
             caption=f"*{good_info["full_name"]}* \n\n"+good_info["description"]+f"\n\nЦена: {int(round(good_info["price_rub"], -2))} RUB",
-            reply_markup = kb.back_to_stock(),
+            reply_markup = kb.good_card(),
             disable_notification=True,
             parse_mode="MARKDOWN"
         )

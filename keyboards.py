@@ -1,28 +1,19 @@
 from telegram import (
     InlineKeyboardButton,
-    InlineKeyboardMarkup,
-    WebAppInfo,
-)
+    InlineKeyboardMarkup
+    )
 from json import dumps
 
 
-
-
 def start_menu():
-    keyboard = [
+    return InlineKeyboardMarkup([
             [
                 InlineKeyboardButton("Товар в Наличии", callback_data=dumps({"from": "menu", "to": "stock"})), 
             ],
             [
                 InlineKeyboardButton("Товар под Заказ", callback_data=dumps({"from": "menu", "to": "order"})),
-            ],
-            [
-                InlineKeyboardButton("Support",  url='t.me/best_tech_shop'),
             ]
-        ]
-    
-    return InlineKeyboardMarkup(keyboard)
-
+        ])
 
 
 def stock(goods_in_stock: list[tuple]):
@@ -34,5 +25,9 @@ def stock(goods_in_stock: list[tuple]):
 
     return InlineKeyboardMarkup(keyboard)
 
-def back_to_stock():
-    return InlineKeyboardMarkup([[InlineKeyboardButton("Назад", callback_data=dumps({"from": "good", "to" : "stock"}))]])
+
+def good_card():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("Чат заказа", url='t.me/best_tech_shop')],
+        [InlineKeyboardButton("Назад", callback_data=dumps({"from": "good", "to" : "stock"}))],
+        ])
