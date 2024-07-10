@@ -100,7 +100,7 @@ async def button_callback_handler(update: Update, context: CallbackContext) -> N
     callback = json.loads(query.data)
     from_ = callback.get("from")
     to_ = callback.get("to")
-    
+
     
     if from_ == -1:
         return
@@ -123,10 +123,10 @@ async def button_callback_handler(update: Update, context: CallbackContext) -> N
         msg = await context.bot.send_photo(
             chat_id=chat_id,
             photo=BytesIO(bytearray(good_data["photo"])),
-            caption=f"*{good_data["full_name"]}* \n\n"+good_data["description"]+f"\n\nЦена: *{int(round(good_data["price_rub"], -2)):,}* RUB",
+            caption=f"<b>{good_data["full_name"]}</b> \n\n"+good_data["description"]+f"\n\nЦена: *{int(round(good_data["price_rub"], -2)):,}* RUB",
             reply_markup = kb.good_card(good_data["model"]),
             disable_notification=True,
-            parse_mode="MARKDOWN"
+            parse_mode = "HTML"
         )
         db.set_user_attribute(tg_id=user_id, key = "msg_id_with_kb", value = msg.id) # sets last message with kb
     

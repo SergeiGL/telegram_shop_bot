@@ -33,7 +33,7 @@ def stock_versions(model: str, versions_in_stock: list[str]):
         if n % 2 != 0:  # if the list has an odd number of elements
             keyboard.append([
                             InlineKeyboardButton(versions_list[-1], callback_data=dumps({"good" : model+ " " + versions_list[-1]})),
-                            InlineKeyboardButton("hi", callback_data=dumps({"from": -1}))
+                            InlineKeyboardButton(" ", callback_data=dumps({"from": -1}))
                             ])
 
     keyboard = [[InlineKeyboardButton(model, callback_data=dumps({"from": -1}))]]
