@@ -1,7 +1,10 @@
 import psycopg2
 from psycopg2.extras import DictCursor
 import config
-from io import BytesIO
+
+def validate_text(text):
+    return text.replace("'", " ").replace('"', " ")
+
 
 class Database:
     def __init__(self):
@@ -14,6 +17,10 @@ class Database:
             )
         
         self.conn.autocommit = True
+    
+    def __del__(self):
+        self.conn.close()
+        print("Connection closed")
     
     def add_new_user_if_not_exist(self, tg_id: int, chat_id: int, username: str):
         with self.conn.cursor() as cursor:
@@ -52,39 +59,42 @@ class Database:
             return value[0]
     
     
-    def get_exhange_rate(self, pair: str):
+    def get_models_in_stock(self):
         with self.conn.cursor() as cursor:
-            cursor.execute("""SELECT rate FROM exchange_rate WHERE pair = %s;""", (pair, ))
-            return cursor.fetchone()[0]
+            cursor.execute("""SELECT DISTINCT model from goods WHERE quantity_in_stock > 0""")
+            res = cursor.fetchall()
+            return [model for (model,) in res]
     
-    def get_goods_in_stock(self):
+    def get_versions_in_stock(self, model):
         with self.conn.cursor() as cursor:
-            cursor.execute("""SELECT full_name, price_RUB from goods WHERE quantity_in_stock > 0""")
-            return cursor.fetchall()
+            cursor.execute("""SELECT version from goods WHERE quantity_in_stock > 0 AND model = %s""", (model, ))
+            res = cursor.fetchall()
+            return [vers for (vers,) in res]
     
-    def get_info_and_photos(self, full_name, user_id):
+    def get_good_data(self, full_name, user_id):
         with self.conn.cursor(cursor_factory=DictCursor) as cursor:
-            cursor.execute("SELECT * FROM goods WHERE full_name = %s", (full_name,))
-            good_info = dict(cursor.fetchone())
-            model = good_info["model"]
-            
-            cursor.execute("SELECT photo FROM goods_photos WHERE model = %s", (model,))
-            good_photo = BytesIO(bytearray(cursor.fetchone()['photo']))
+            cursor.execute("SELECT full_name, model, description, price_rub, photo FROM goods WHERE full_name = %s", (full_name,))
+            good_data = dict(cursor.fetchone())
 
             cursor.execute("""
                 UPDATE users
                 SET interactions_counter = interactions_counter + 1
                 WHERE tg_id = %s;
                 """, (user_id, ))
-        return good_info, good_photo
+            
+            return good_data
+
+
+
+
     
     def insert_error(self, error_text: str):
         with self.conn.cursor() as cursor:
             cursor.execute("INSERT INTO errors(error) VALUES (%s);", (validate_text(error_text), ))
 
+    def get_exhange_rate(self, pair: str):
+        with self.conn.cursor() as cursor:
+            cursor.execute("""SELECT rate FROM exchange_rate WHERE pair = %s;""", (pair, ))
+            return cursor.fetchone()[0]
 
-
-
-def validate_text(text):
-    return text.replace("'", " ").replace('"', " ")
 

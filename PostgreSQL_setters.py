@@ -1,47 +1,41 @@
 import psycopg2
 import config
-import os
+from random import randint
+
 
 if __name__ == "__main__":
-        
-        conn = psycopg2.connect(
-                        host = config.db_config['host'],
-                        dbname = config.db_config['dbname'],
-                        user = config.db_config['user'],
-                        password = config.db_config['password'],
-                        port = config.db_config['port'],
-                        )
+    
+    conn = psycopg2.connect(
+            host = config.db_config['host'],
+            dbname = config.db_config['dbname'],
+            user = config.db_config['user'],
+            password = config.db_config['password'],
+            port = config.db_config['port'],
+            )
 
-        conn.autocommit = True
-        cursor = conn.cursor()
-
+    conn.autocommit = True
+    
+    with conn.cursor() as cursor:
         cursor.execute(
-                """INSERT INTO exchange_rates(
-                        pair,
-                        rate)
-                VALUES ('USD_RUB', 100), ('EUR_RUB', 110)
-                ON CONFLICT (pair) DO NOTHING
-                ;""")
+        """INSERT INTO exchange_rates(
+                pair,
+                rate)
+        VALUES ('USD_RUB', 100), ('EUR_RUB', 110)
+        ON CONFLICT (pair) DO NOTHING
+        ;""")
 
-        with conn.cursor() as cursor:
-            for good_name in os.listdir('goods'):
-                with open(f'goods/{good_name}/description.txt', 'r') as f:
-                    description = "\n".join(f.readlines())
-                
-                with open(f'goods/{good_name}/picture.png', 'rb') as f:
-                    binary_picture = f.read()
-                
-                for memory_size_str in [" 256 GB", " 512 GB"]:
-                    cursor.execute("""INSERT INTO goods (full_name, model, description, quantity_in_stock) 
-                        VALUES (%s, %s, %s, %s) ON CONFLICT (full_name) DO NOTHING""", 
-                        (good_name+memory_size_str, good_name, description, 1)
-                        )
-                
-                cursor.execute("""INSERT INTO goods_photos (model, photo) 
-                    VALUES (%s, %s)""", 
-                    (good_name, psycopg2.Binary(binary_picture))
-                    )
-        
-        cursor.close()
-        conn.close()
-
+        for model in ["iPhone 15", "iPhone 14"]:
+            for version in ["256GB ⬜", "512GB ⬛", "PRO 256GB ⬜", "PRO 512GB ⬛"]:
+                cursor.execute(
+                    """INSERT INTO goods(
+                        model,
+                        version,
+                        description,
+                        quantity_in_stock,
+                        price_rub,
+                        photo)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (full_name) DO NOTHING;""", (model, version, f"Nice {model+" "+ version}. You could by it :-)", 1, randint(10_000, 100_000) , \
+                    psycopg2.Binary(open('assets/tech_shop_logo_only_dark.png', 'rb').read())))
+    
+    conn.close()

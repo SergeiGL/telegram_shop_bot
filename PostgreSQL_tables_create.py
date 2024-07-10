@@ -18,7 +18,7 @@ if __name__ == "__main__":
         """CREATE TABLE IF NOT EXISTS users(
                 tg_id BIGINT PRIMARY KEY NOT NULL,
                 chat_id BIGINT NOT NULL,
-                username varchar(100) NOT NULL,
+                username VARCHAR(100) NOT NULL,
 
                 first_seen timestamptz DEFAULT CURRENT_TIMESTAMP NOT NULL,
                 interactions_counter BIGINT DEFAULT 0 NOT NULL,
@@ -29,23 +29,20 @@ if __name__ == "__main__":
 
     cursor.execute(
         """CREATE TABLE IF NOT EXISTS goods (
-                full_name TEXT PRIMARY KEY,
-                model TEXT NOT NULL,
-                description TEXT NOT NULL,
+                model VARCHAR(25) NOT NULL,
+                version VARCHAR(25) NOT NULL,
+                full_name VARCHAR(60) GENERATED ALWAYS AS (model || ' ' || version) STORED PRIMARY KEY,
+                description VARCHAR(500) NOT NULL,
                 quantity_in_stock INTEGER DEFAULT 0 NOT NULL,
-                price_RUB INTEGER DEFAULT 0 NOT NULL
-                );""")
-
-    cursor.execute(
-        """CREATE TABLE IF NOT EXISTS goods_photos (
-                model TEXT PRIMARY KEY,
+                price_RUB INTEGER DEFAULT 0 NOT NULL,
                 photo BYTEA NOT NULL
                 );""")
+    cursor.execute("""CREATE INDEX IF NOT EXISTS idx_model_quantity_in_stock ON goods (model, quantity_in_stock);""")
+    cursor.execute("""CREATE INDEX IF NOT EXISTS idx_quantity_in_stock ON goods (quantity_in_stock);""")
     
-
     cursor.execute(
         """CREATE TABLE IF NOT EXISTS exchange_rates(
-                pair varchar(100) PRIMARY KEY NOT NULL,
+                pair VARCHAR(20) PRIMARY KEY NOT NULL,
                 rate real DEFAULT 100 NOT NULL
                 );""")
 
