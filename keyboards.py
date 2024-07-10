@@ -46,6 +46,6 @@ def stock_versions(model: str, versions_in_stock: list[str]):
 
 def good_card(model: str):
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("Чат заказа", url='t.me/best_tech_shop')],
+        [InlineKeyboardButton("Купить", url='t.me/best_tech_shop')],
         [InlineKeyboardButton("Назад", callback_data=dumps({"from": "good", "to": "vers", "modl" : model}))],
         ])
