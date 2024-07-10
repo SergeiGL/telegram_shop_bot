@@ -7,13 +7,9 @@ from json import dumps
 
 def start_menu():
     return InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton("Товар в Наличии", callback_data=dumps({"from": "menu", "to": "stock"})), 
-            ],
-            [
-                InlineKeyboardButton("Товар под Заказ", callback_data=dumps({"from": "menu", "to": "order"})),
-            ]
-        ])
+        [InlineKeyboardButton("Товар в Наличии", callback_data=dumps({"from": "menu", "to": "stock"}))],
+        [InlineKeyboardButton("Товар под Заказ", callback_data=dumps({"from": "menu", "to": "order"}))]
+    ])
 
 
 def stock(goods_in_stock: list[tuple]):

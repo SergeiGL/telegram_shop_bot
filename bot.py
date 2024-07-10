@@ -57,12 +57,12 @@ async def db_msg_delete(what_to_delete, user_id, chat_id, context):
     
     if msg_id_to_delete != -1:
         if await try_msg_delete(chat_id, msg_id_to_delete, context): 
-            db.set_user_attribute(user_tg_id = user_id, key = what_to_delete, value = -1)
+            db.set_user_attribute(tg_id = user_id, key = what_to_delete, value = -1)
 
 
 async def register_user_if_not_exist(user, user_id: int, chat_id: int):
     db.add_new_user_if_not_exist(
-        user_tg_id = user_id,
+        tg_id = user_id,
         chat_id = chat_id,
         username=user.username or "Unknown")
 
@@ -76,19 +76,17 @@ async def start_handle(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
     
-    await try_msg_delete(chat_id=chat_id, message_id = update.message.id, context=context)
-
     await register_user_if_not_exist(user = update.effective_user , user_id = user_id, chat_id=chat_id)
     
     await db_msg_delete("msg_id_with_kb", user_id, chat_id, context)
     
-    msg = await context.bot.send_photo(
+    msg = await context.bot.send_animation(
                                 chat_id=chat_id,
-                                photo=PATH_TO_MENU_PICTURE,
+                                animation=PATH_TO_MENU_MEDIA,
                                 reply_markup= kb.start_menu(),
                                 disable_notification=True,
                             )
-    db.set_user_attribute(user_tg_id=user_id, key = "msg_id_with_kb", value = msg.id) # sets last message with kb
+    db.set_user_attribute(tg_id=user_id, key = "msg_id_with_kb", value = msg.id) # sets last message with kb
 
 
 
@@ -118,29 +116,30 @@ async def button_callback_handler(update: Update, context: CallbackContext) -> N
         if not await try_msg_delete(chat_id=chat_id, message_id = message_id, context=context):
             await query.edit_message_reply_markup(reply_markup=None)
         
-        good_info, good_photo = db.get_info_and_photos(full_name)
+        good_info, good_photo = db.get_info_and_photos(full_name, user_id)
         
         msg = await context.bot.send_photo(
             chat_id=chat_id,
             photo=good_photo,
-            caption=f"*{good_info["full_name"]}* \n\n"+good_info["description"]+f"\n\nЦена: {int(round(good_info["price_rub"], -2))} RUB",
+            caption=f"*{good_info["full_name"]}* \n\n"+good_info["description"]+f"\n\nЦена: *{int(round(good_info["price_rub"], -2)):,}* RUB",
             reply_markup = kb.good_card(),
             disable_notification=True,
             parse_mode="MARKDOWN"
         )
-        db.set_user_attribute(user_tg_id=user_id, key = "msg_id_with_kb", value = msg.id) # sets last message with kb
+        db.set_user_attribute(tg_id=user_id, key = "msg_id_with_kb", value = msg.id) # sets last message with kb
 
     elif from_ == "good" and to_ == "stock":
         if not await try_msg_delete(chat_id=chat_id, message_id = message_id, context=context):
             await query.edit_message_reply_markup(reply_markup=None)
         
-        msg = await context.bot.send_photo(
-            chat_id=chat_id,
-            photo=PATH_TO_MENU_PICTURE,
-            reply_markup = kb.stock(goods_in_stock = db.get_goods_in_stock()),
-            disable_notification=True
-        )
-        db.set_user_attribute(user_tg_id=user_id, key = "msg_id_with_kb", value = msg.id) # sets last message with kb
+        msg = await context.bot.send_animation(
+                chat_id=chat_id,
+                animation=PATH_TO_MENU_MEDIA,
+                reply_markup = kb.stock(goods_in_stock = db.get_goods_in_stock()),
+                disable_notification=True
+            )
+
+        db.set_user_attribute(tg_id=user_id, key = "msg_id_with_kb", value = msg.id) # sets last message with kb
 
     else:
         if config.production != True: print(f"Unknown button: from_ {from_}, to {to_}")
@@ -189,7 +188,8 @@ def run_bot() -> None:
 
 
 
-PATH_TO_MENU_PICTURE = path.join("assets", "menu.png")
+PATH_TO_MENU_MEDIA = path.join("assets", "logo_animation.gif")
+
 db = database.Database()
 
 if __name__ == "__main__":
