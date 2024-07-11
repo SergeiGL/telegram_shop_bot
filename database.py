@@ -2,6 +2,7 @@ import psycopg2
 from psycopg2.extras import DictCursor
 import config
 
+
 def validate_text(text):
     return text.replace("'", " ").replace('"', " ")
 
@@ -58,7 +59,6 @@ class Database:
         else:
             return value[0]
     
-    
     def get_models_in_stock(self):
         with self.conn.cursor() as cursor:
             cursor.execute("""SELECT DISTINCT model from goods WHERE quantity_in_stock > 0""")
@@ -74,8 +74,13 @@ class Database:
     def get_good_data(self, full_name, user_id):
         with self.conn.cursor(cursor_factory=DictCursor) as cursor:
             cursor.execute("SELECT full_name, model, description, price_rub, photo FROM goods WHERE full_name = %s", (full_name,))
-            good_data = dict(cursor.fetchone())
-
+            
+            good_data = cursor.fetchone()
+            if good_data is None:
+                return False
+            else:
+                good_data = dict(good_data)
+            
             cursor.execute("""
                 UPDATE users
                 SET interactions_counter = interactions_counter + 1
@@ -83,10 +88,7 @@ class Database:
                 """, (user_id, ))
             
             return good_data
-
-
-
-
+    
     
     def insert_error(self, error_text: str):
         with self.conn.cursor() as cursor:

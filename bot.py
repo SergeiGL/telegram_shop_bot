@@ -5,9 +5,7 @@ import traceback
 import requests
 
 from telegram import (
-    Update,
-    # InputMedia,
-    InputMediaPhoto,
+    Update
 )
 from telegram.ext import (
     Application,
@@ -68,9 +66,6 @@ async def start_handle(update: Update, context: CallbackContext) -> None:
             chat_id = chat_id,
             username=user.username or "Unknown")
     
-    if update is None or update.message is None:
-        return
-    
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
     
@@ -80,7 +75,7 @@ async def start_handle(update: Update, context: CallbackContext) -> None:
     
     msg = await context.bot.send_animation(
                                 chat_id=chat_id,
-                                animation=PATH_TO_MENU_MEDIA,
+                                animation=PATH_TO_MENU_ANIMATION,
                                 reply_markup= kb.start_menu(),
                                 disable_notification=True,
                             )
@@ -119,6 +114,9 @@ async def button_callback_handler(update: Update, context: CallbackContext) -> N
             await query.edit_message_reply_markup(reply_markup=None)
         
         good_data = db.get_good_data(good_full_name, user_id)
+        if good_data == False:
+            await start_handle(update, context)
+            return
         
         msg = await context.bot.send_photo(
             chat_id=chat_id,
@@ -137,7 +135,7 @@ async def button_callback_handler(update: Update, context: CallbackContext) -> N
         
         msg = await context.bot.send_animation(
                 chat_id=chat_id,
-                animation=PATH_TO_MENU_MEDIA,
+                animation=PATH_TO_MENU_ANIMATION,
                 reply_markup = kb.stock_versions(model, db.get_versions_in_stock(model)),
                 disable_notification=True
             )
@@ -149,11 +147,18 @@ async def button_callback_handler(update: Update, context: CallbackContext) -> N
 
 
 
-
-
-
-async def post_init(application: Application):
+async def post_init(application: Application) -> None:
     await application.bot.set_my_commands([]) # hide default blue menu button to the left of the keyboard with commands list
+
+async def message_handle(update: Update, context: CallbackContext) -> None:
+    chat_id = update.effective_chat.id
+    message_id = update.effective_message.id
+
+    # Сheck if message is edited (to avoid AttributeError: 'NoneType' object has no attribute 'from_user')
+    if update.edited_message or update.message is None:
+        return
+    
+    await try_msg_delete(chat_id, message_id, context)
 
 async def error_handle(update: Update, context: CallbackContext) -> None:
     error = str(traceback.format_exc())
@@ -162,7 +167,15 @@ async def error_handle(update: Update, context: CallbackContext) -> None:
     await start_handle(update, context)
 
 
-def run_bot() -> None:
+
+
+
+
+PATH_TO_MENU_ANIMATION = path.join("assets", "logo_animation.gif")
+
+db = database.Database()
+
+if __name__ == "__main__":
     application = (
         ApplicationBuilder()
         .token(config.telegram_token)
@@ -174,21 +187,10 @@ def run_bot() -> None:
         .build()
     )
 
-
-    # application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handle))
     application.add_handler(CommandHandler("start", start_handle))
     application.add_handler(CallbackQueryHandler(button_callback_handler))
+    application.add_handler(MessageHandler(filters.ALL, message_handle))
     application.add_error_handler(error_handle)
 
 
     application.run_polling()
-
-
-
-
-PATH_TO_MENU_MEDIA = path.join("assets", "logo_animation.gif")
-
-db = database.Database()
-
-if __name__ == "__main__":
-    run_bot()
