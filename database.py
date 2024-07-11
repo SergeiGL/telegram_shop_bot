@@ -54,27 +54,26 @@ class Database:
             cursor.execute(f"""SELECT {select} FROM {from_} WHERE {where} = %s;""", (value, ))
             value = cursor.fetchone()
         
-        if value==None or value[0]==None: # value = None if tg_id not found 
+        if (value is None) or (value[0] is None): # value = None if tg_id not found 
             raise ValueError(f"DB: not found a value\nget_attribute(self, {from_}: str, {value}: int, {select}: str)")
         else:
             return value[0]
     
     def get_models_in_stock(self):
         with self.conn.cursor() as cursor:
-            cursor.execute("""SELECT DISTINCT model from goods WHERE quantity_in_stock > 0""")
+            cursor.execute("""SELECT DISTINCT model from goods WHERE quantity_in_stock > 0 ORDER BY model""")
             res = cursor.fetchall()
             return [model for (model,) in res]
     
     def get_versions_in_stock(self, model):
         with self.conn.cursor() as cursor:
-            cursor.execute("""SELECT version from goods WHERE quantity_in_stock > 0 AND model = %s""", (model, ))
+            cursor.execute("""SELECT version from goods WHERE quantity_in_stock > 0 AND model = %s ORDER BY version""", (model, ))
             res = cursor.fetchall()
             return [vers for (vers,) in res]
     
     def get_good_data(self, full_name, user_id):
         with self.conn.cursor(cursor_factory=DictCursor) as cursor:
-            cursor.execute("SELECT full_name, model, description, price_rub, photo FROM goods WHERE full_name = %s", (full_name,))
-            
+            cursor.execute("SELECT full_name, model, description, price_rub, photo FROM goods WHERE full_name = %s AND quantity_in_stock > 0", (full_name,))
             good_data = cursor.fetchone()
             if good_data is None:
                 return False
