@@ -78,6 +78,7 @@ async def start_handle(update: Update, context: CallbackContext) -> None:
                                 animation=PATH_TO_MENU_ANIMATION,
                                 reply_markup= kb.start_menu(),
                                 disable_notification=True,
+                                parse_mode = "HTML"
                             )
     db.set_user_attribute(tg_id=user_id, key = "msg_id_with_kb", value = msg.id) # sets last message with kb
 
@@ -124,8 +125,7 @@ async def button_callback_handler(update: Update, context: CallbackContext) -> N
             caption=f"<b>{good_data["full_name"]}</b> \n\n"+good_data["description"]+f"\n\nЦена: <b>{int(round(good_data["price_rub"], -2)):,}</b> RUB",
             reply_markup = kb.good_card(good_data["model"]),
             disable_notification=True,
-            parse_mode = "HTML"
-        )
+            parse_mode = "HTML")
         db.set_user_attribute(tg_id=user_id, key = "msg_id_with_kb", value = msg.id) # sets last message with kb
     
     elif from_ == "good" and to_ == "vers":
@@ -137,8 +137,8 @@ async def button_callback_handler(update: Update, context: CallbackContext) -> N
                 chat_id=chat_id,
                 animation=PATH_TO_MENU_ANIMATION,
                 reply_markup = kb.stock_versions(model, db.get_versions_in_stock(model)),
-                disable_notification=True
-            )
+                disable_notification=True,
+                parse_mode = "HTML")
         db.set_user_attribute(tg_id=user_id, key = "msg_id_with_kb", value = msg.id) # sets last message with kb
 
     else:
@@ -178,7 +178,7 @@ db = database.Database()
 if __name__ == "__main__":
     application = (
         ApplicationBuilder()
-        .token(config.telegram_token)
+        .token(config.telegram_bot_token)
         .concurrent_updates(True)
         .rate_limiter(AIORateLimiter(max_retries=5))
         .http_version("1.1")

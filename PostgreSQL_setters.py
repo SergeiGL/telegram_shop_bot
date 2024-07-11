@@ -16,14 +16,6 @@ if __name__ == "__main__":
     conn.autocommit = True
     
     with conn.cursor() as cursor:
-        cursor.execute(
-        """INSERT INTO exchange_rates(
-                pair,
-                rate)
-        VALUES ('USD_RUB', 100), ('EUR_RUB', 110)
-        ON CONFLICT (pair) DO NOTHING
-        ;""")
-
         for model in ["iPhone 15", "iPhone 14"]:
             for version in ["256GB ⬜", "512GB ⬛", "PRO 256GB ⬜", "PRO 512GB ⬛"]:
                 cursor.execute(
