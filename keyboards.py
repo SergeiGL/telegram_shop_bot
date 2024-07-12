@@ -31,12 +31,12 @@ def stock_versions(model: str, versions_in_stock: list[str]):
             n = len(versions_list)
             for i in range(0, n - 1, 2):
                 keyboard.append([
-                                InlineKeyboardButton(versions_list[i], callback_data=dumps({"good" : model+ " " + versions_list[i]})),
-                                InlineKeyboardButton(versions_list[i+1], callback_data=dumps({"good" : model+ " " + versions_list[i+1]}))
+                                InlineKeyboardButton(versions_list[i], callback_data=dumps({"gd_mdl" : model, "gd_vsn" : versions_list[i]})),
+                                InlineKeyboardButton(versions_list[i+1], callback_data=dumps({"gd_mdl" : model, "gd_vsn" : versions_list[i+1]}))
                                 ])
             if n % 2 != 0:  # if the list has an odd number of elements
                 keyboard.append([
-                                InlineKeyboardButton(versions_list[-1], callback_data=dumps({"good" : model+ " " + versions_list[-1]})),
+                                InlineKeyboardButton(versions_list[-1], callback_data=dumps({"gd_mdl" : model, "gd_vsn" : versions_list[-1]})),
                                 InlineKeyboardButton(" ", callback_data=dumps({"from": -1}))
                                 ])
 

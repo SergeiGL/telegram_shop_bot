@@ -2,7 +2,6 @@ import asyncio
 import json
 from os import path
 import traceback
-import requests
 
 from telegram import (
     Update
@@ -25,6 +24,8 @@ import keyboards as kb
 
 import config
 from io import BytesIO
+from tg import send_telegram_message
+
 
 def timing_wrapper(func):
     import time
@@ -78,8 +79,7 @@ async def start_handle(update: Update, context: CallbackContext) -> None:
                                 animation=PATH_TO_MENU_ANIMATION,
                                 reply_markup= kb.start_menu(),
                                 disable_notification=True,
-                                parse_mode = "HTML"
-                            )
+                                parse_mode = "HTML")
     db.set_user_attribute(tg_id=user_id, key = "msg_id_with_kb", value = msg.id) # sets last message with kb
 
 
@@ -110,19 +110,23 @@ async def button_callback_handler(update: Update, context: CallbackContext) -> N
     elif model := callback.get("model"):
         await query.edit_message_reply_markup(reply_markup=kb.stock_versions(model, db.get_versions_in_stock(model)))
     
-    elif good_full_name := callback.get("good"):
+    elif (model := callback.get("gd_mdl")) and (version := callback.get("gd_vsn")):
         if not await try_msg_delete(chat_id=chat_id, message_id = message_id, context=context):
             await query.edit_message_reply_markup(reply_markup=None)
         
-        good_data = db.get_good_data(good_full_name, user_id)
+        good_data = db.get_good_data(model=model, version=version, user_id=user_id)
         if good_data == False:
             await start_handle(update, context)
             return
         
+        message_text = f"<b>{good_data["model"]+ " "+ good_data["version"]}\n\n" + \
+                        f"Цена: {int(round( good_data["price_usd"]*good_data["exch_rate"]*(1+good_data["margin_order"]/100), -2 )):,} RUB</b>\n\n" + \
+                        good_data["description"]
+        
         msg = await context.bot.send_photo(
             chat_id=chat_id,
             photo=BytesIO(bytearray(good_data["photo"])),
-            caption=f"<b>{good_data["full_name"]}</b> \n\n"+good_data["description"]+f"\n\nЦена: <b>{int(round(good_data["price_rub"], -2)):,}</b> RUB",
+            caption=message_text,
             reply_markup = kb.good_card(good_data["model"]),
             disable_notification=True,
             parse_mode = "HTML")
@@ -163,7 +167,10 @@ async def message_handle(update: Update, context: CallbackContext) -> None:
 async def error_handle(update: Update, context: CallbackContext) -> None:
     error = str(traceback.format_exc())
     if not config.production: print(error)
-    db.insert_error(error)
+    try:
+        if config.production: send_telegram_message(error)
+        db.insert_error(error)
+    except: pass
     await start_handle(update, context)
 
 

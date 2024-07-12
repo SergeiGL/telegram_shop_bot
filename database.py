@@ -42,7 +42,6 @@ class Database:
                         f"""UPDATE users
                             SET {key} = %s
                             WHERE tg_id = %s;""", (value, tg_id))
-            
             affected_rows = cursor.rowcount
         
         if affected_rows == 0:
@@ -71,14 +70,22 @@ class Database:
             res = cursor.fetchall()
             return [vers for (vers,) in res]
     
-    def get_good_data(self, full_name, user_id):
+    def get_good_data(self, model : str, version: str, user_id):
         with self.conn.cursor(cursor_factory=DictCursor) as cursor:
-            cursor.execute("SELECT full_name, model, description, price_rub, photo FROM goods WHERE full_name = %s AND quantity_in_stock > 0", (full_name,))
+            cursor.execute(
+                        """SELECT g.specification_name, g.model, g.version, g.description, g.photo, sp.price_USD, sp.margin_order
+                        FROM goods g
+                        JOIN supplier_prices sp ON g.specification_name = sp.specification_name
+                        WHERE g.model = %s AND g.version = %s AND g.quantity_in_stock > 0""", (model, version))
             good_data = cursor.fetchone()
-            if good_data is None:
+            
+            cursor.execute("""SELECT exch_rate FROM exchange_rates WHERE pair = %s;""", ("BUY USDT", ))
+            exchange_rate_data = cursor.fetchone()
+            if (good_data is None) or (exchange_rate_data is None):
                 return False
             else:
                 good_data = dict(good_data)
+                good_data.update(dict(exchange_rate_data))
             
             cursor.execute("""
                 UPDATE users
@@ -92,10 +99,3 @@ class Database:
     def insert_error(self, error_text: str):
         with self.conn.cursor() as cursor:
             cursor.execute("INSERT INTO errors(error) VALUES (%s);", (validate_text(error_text), ))
-
-    def get_exhange_rate(self, pair: str):
-        with self.conn.cursor() as cursor:
-            cursor.execute("""SELECT rate FROM exchange_rate WHERE pair = %s;""", (pair, ))
-            return cursor.fetchone()[0]
-
-
