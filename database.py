@@ -72,28 +72,20 @@ class Database:
     
     def get_good_data(self, model : str, version: str, user_id):
         with self.conn.cursor(cursor_factory=DictCursor) as cursor:
-            cursor.execute(
-                        """SELECT g.specification_name, g.model, g.version, g.description, g.photo, sp.price_USD, sp.margin_order
-                        FROM goods g
-                        JOIN supplier_prices sp ON g.specification_name = sp.specification_name
-                        WHERE g.model = %s AND g.version = %s AND g.quantity_in_stock > 0""", (model, version))
+            cursor.execute("""
+                SELECT g.specification_name, g.model, g.version, g.description, g.photo, sp.price_USD, sp.margin_order,
+                    (SELECT exch_rate FROM exchange_rates WHERE pair = 'BUY USDT') AS exch_rate
+                FROM goods g
+                JOIN supplier_prices sp ON g.specification_name = sp.specification_name
+                WHERE g.model = %s AND g.version = %s AND g.quantity_in_stock > 0
+            """, (model, version))
+            
             good_data = cursor.fetchone()
             
-            cursor.execute("""SELECT exch_rate FROM exchange_rates WHERE pair = %s;""", ("BUY USDT", ))
-            exchange_rate_data = cursor.fetchone()
-            if (good_data is None) or (exchange_rate_data is None):
+            if good_data is None:
                 return False
-            else:
-                good_data = dict(good_data)
-                good_data.update(dict(exchange_rate_data))
             
-            cursor.execute("""
-                UPDATE users
-                SET interactions_counter = interactions_counter + 1
-                WHERE tg_id = %s;
-                """, (user_id, ))
-            
-            return good_data
+            return dict(good_data)
     
     
     def insert_error(self, error_text: str):

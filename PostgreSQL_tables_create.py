@@ -19,9 +19,8 @@ if __name__ == "__main__":
                 tg_id BIGINT PRIMARY KEY NOT NULL,
                 chat_id BIGINT NOT NULL,
                 username VARCHAR(100) NOT NULL,
-
+                
                 first_seen timestamptz DEFAULT CURRENT_TIMESTAMP NOT NULL,
-                interactions_counter BIGINT DEFAULT 0 NOT NULL,
                 
                 msg_id_with_kb BIGINT DEFAULT -1 NOT NULL
                 );""")
