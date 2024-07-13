@@ -1,0 +1,9 @@
+requests
+python-telegram-bot[rate-limiter]
+redis
+fake_useragent
+asyncio
+psycopg2-binary
+beautifulsoup4
+apscheduler
+lxml

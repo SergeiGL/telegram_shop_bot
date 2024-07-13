@@ -3,7 +3,7 @@ from psycopg2.extras import DictCursor
 import config
 import redis
 import json
-
+from base64 import b64encode
 
 def validate_text(text):
     return text.replace("'", " ").replace('"', " ")
@@ -68,13 +68,13 @@ class Database:
             return value[0]
     
     def get_stock_models(self):
-        cache_key = "get_stock_models"
+        cache_key = "models"
         
         cached_result = self.redis.get(cache_key)
         if cached_result:
             return json.loads(cached_result)
         else:
-            print("DB request")
+            if not config.production: print("DB request")
             with self.conn.cursor() as cursor:
                 cursor.execute("""SELECT DISTINCT model from goods WHERE quantity_in_stock > 0 ORDER BY model""")
                 res = cursor.fetchall()
@@ -83,13 +83,13 @@ class Database:
                 return models
     
     def get_stock_versions(self, model):
-        cache_key = f"get_stock_versions{model}"
+        cache_key = f"version{model}"
         
         cached_result = self.redis.get(cache_key)
         if cached_result:
             return json.loads(cached_result)
         else:
-            print("DB request")
+            if not config.production: print("DB request")
             with self.conn.cursor() as cursor:
                 cursor.execute("""SELECT version from goods WHERE quantity_in_stock > 0 AND model = %s ORDER BY version""", (model, ))
                 res = cursor.fetchall()
@@ -98,22 +98,34 @@ class Database:
                 return versions
     
     def get_good_data(self, model : str, version: str):
-        with self.conn.cursor(cursor_factory=DictCursor) as cursor:
-            cursor.execute("""
-                SELECT g.specification_name, g.model, g.version, g.description, g.photo, sp.price_USD, sp.margin_order,
-                    (SELECT exch_rate FROM exchange_rates WHERE pair = 'BUY USDT') AS exch_rate
-                FROM goods g
-                JOIN supplier_prices sp ON g.specification_name = sp.specification_name
-                WHERE g.model = %s AND g.version = %s AND g.quantity_in_stock > 0
-            """, (model, version))
-            
-            good_data = cursor.fetchone()
-            
-            if good_data is None:
-                return False
-            
-            return dict(good_data)
-    
+        cache_key = f"good{model}{version}"
+        
+        cached_result = self.redis.get(cache_key)
+        if cached_result:
+            return json.loads(cached_result)
+        else:
+            if not config.production: print("DB request")
+            with self.conn.cursor(cursor_factory=DictCursor) as cursor:
+                cursor.execute("""
+                    SELECT g.specification_name, g.model, g.version, g.description, g.photo, sp.price_USD, sp.margin_order,
+                        (SELECT exch_rate FROM exchange_rates WHERE pair = 'BUY USDT') AS exch_rate
+                    FROM goods g
+                    JOIN supplier_prices sp ON g.specification_name = sp.specification_name
+                    WHERE g.model = %s AND g.version = %s AND g.quantity_in_stock > 0
+                """, (model, version))
+                
+                good_data = cursor.fetchone()
+                
+                if good_data is None:
+                    return False
+                
+                good_data_dict = dict(good_data)
+                
+                # Handle photo object as it cannot be directly stored in redis
+                good_data_dict["photo"] = b64encode(good_data_dict["photo"].tobytes()).decode('utf-8')
+                
+                self.redis.set(cache_key, json.dumps(good_data_dict))
+                return good_data_dict
     
     def insert_error(self, error_text: str):
         with self.conn.cursor() as cursor:

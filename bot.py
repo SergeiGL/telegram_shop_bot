@@ -14,30 +14,17 @@ from telegram.ext import (
     MessageHandler,
     CallbackQueryHandler,
     AIORateLimiter,
-    filters,
-    PreCheckoutQueryHandler,
-
+    filters
 )
+
+
+from base64 import b64decode
+from io import BytesIO
 
 import database
 import keyboards as kb
-
 import config
-from io import BytesIO
 from tg import send_telegram_message
-
-
-def timing_wrapper(func):
-    import time
-    def wrapper(*args, **kwargs):
-        start = time.time()
-        result = func(*args, **kwargs)
-        end = time.time()
-        print(f"Function {func.__name__} took {(end - start):.6f} seconds to run.")
-        return result
-    return wrapper
-
-
 
 
 
@@ -125,7 +112,7 @@ async def button_callback_handler(update: Update, context: CallbackContext) -> N
         
         msg = await context.bot.send_photo(
             chat_id=chat_id,
-            photo=BytesIO(bytearray(good_data["photo"])),
+            photo=BytesIO(b64decode(good_data["photo"])),
             caption=message_text,
             reply_markup = kb.good_card(good_data["model"]),
             disable_notification=True,
