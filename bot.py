@@ -152,8 +152,8 @@ async def message_handle(update: Update, context: CallbackContext) -> None:
     await try_msg_delete(chat_id, message_id, context)
 
 async def error_handle(update: Update, context: CallbackContext) -> None:
-    error = str(traceback.format_exc())
-    if not config.production: print(error)
+    error = "ERROR\nbot.py:\n" + str(traceback.format_exc())
+    print(error)
     try:
         if config.production: send_telegram_message(error)
         db.insert_error(error)

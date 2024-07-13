@@ -1,5 +1,7 @@
 import psycopg2
 import config
+from tabulate import tabulate
+
 
 if __name__ == "__main__":
     
@@ -48,7 +50,6 @@ if __name__ == "__main__":
     cursor.execute("""CREATE INDEX IF NOT EXISTS idx_model ON goods (model);""")
     cursor.execute("""CREATE INDEX IF NOT EXISTS idx_version ON goods (version);""")
     cursor.execute("""CREATE INDEX IF NOT EXISTS idx_quantity_in_stock ON goods (quantity_in_stock);""")
-    cursor.execute("""CREATE INDEX IF NOT EXISTS idx_specification_name ON goods (specification_name);""")
     
     
     cursor.execute(
@@ -64,7 +65,56 @@ if __name__ == "__main__":
                 error TEXT NOT NULL
                 );""")
 
+# -- Create a function to notify changes
+    cursor.execute(
+        """CREATE OR REPLACE FUNCTION notify_table_change() RETURNS trigger AS $$
+            BEGIN
+                PERFORM pg_notify('table_change', TG_TABLE_NAME);
+                RETURN NEW;
+            END;
+        $$ LANGUAGE plpgsql;""")
+    
+    try:
+        cursor.execute(
+            """CREATE TRIGGER goods_change_trigger
+                    AFTER INSERT OR UPDATE OR DELETE ON goods
+                    FOR EACH STATEMENT EXECUTE FUNCTION notify_table_change();""")
+    except psycopg2.errors.DuplicateObject: pass
+    
+    try:
+        cursor.execute(
+            """CREATE TRIGGER supplier_prices_change_trigger
+                    AFTER INSERT OR UPDATE OR DELETE ON supplier_prices
+                    FOR EACH STATEMENT EXECUTE FUNCTION notify_table_change();""")
+    except psycopg2.errors.DuplicateObject: pass
 
+    try:
+        cursor.execute(
+            """CREATE TRIGGER exchange_rates_change_trigger
+                    AFTER INSERT OR UPDATE OR DELETE ON exchange_rates
+                    FOR EACH STATEMENT EXECUTE FUNCTION notify_table_change();""")
+    except psycopg2.errors.DuplicateObject: pass
 
+    cursor.execute(
+        """
+        SELECT 
+            tbl.schemaname AS schema_name,
+            tbl.tablename AS table_name,
+            tgr.tgname AS trigger_name
+        FROM 
+            pg_tables tbl
+        LEFT JOIN 
+            pg_class cl ON cl.relname = tbl.tablename
+        LEFT JOIN 
+            pg_trigger tgr ON tgr.tgrelid = cl.oid
+        LEFT JOIN 
+            pg_namespace nsp ON cl.relnamespace = nsp.oid
+        WHERE 
+            tbl.schemaname NOT IN ('pg_catalog', 'information_schema')
+            AND (tgr.tgname IS NULL OR tgr.tgname !~ '^RI_ConstraintTrigger')
+        ORDER BY 
+            tbl.schemaname, tbl.tablename, tgr.tgname;""")
+    print(tabulate(cursor.fetchall()))
+    
     cursor.close()
     conn.close()
