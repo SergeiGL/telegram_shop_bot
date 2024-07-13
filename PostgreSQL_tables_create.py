@@ -62,11 +62,12 @@ if __name__ == "__main__":
                 model VARCHAR(25) NOT NULL,
                 version VARCHAR(25) NOT NULL,
                 quantity_in_stock INTEGER DEFAULT 0 NOT NULL,
-                photo BYTEA NOT NULL,
                 description VARCHAR(500) NOT NULL,
+                photo VARCHAR(255) NOT NULL,
                 FOREIGN KEY (specification_name) REFERENCES supplier_prices(specification_name),
                 UNIQUE (model, version)
                 );""")
+
     cursor.execute("""CREATE INDEX IF NOT EXISTS idx_model ON goods (model);""")
     cursor.execute("""CREATE INDEX IF NOT EXISTS idx_version ON goods (version);""")
     cursor.execute("""CREATE INDEX IF NOT EXISTS idx_quantity_in_stock ON goods (quantity_in_stock);""")

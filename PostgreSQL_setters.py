@@ -40,7 +40,7 @@ if __name__ == "__main__":
                         photo)
                 VALUES (%s, %s, %s, %s, %s, %s)
                 ON CONFLICT (specification_name) DO NOTHING;""", (specification_name, model, version, description, 1 , \
-                    psycopg2.Binary(open('assets/tech_shop_logo_only_dark.png', 'rb').read())))
+                    "AgACAgIAAxkDAAICsmaSy6tKQVNlmjxRrOoxKpvMKHksAALA5DEbtAOYSCe9BcUYgO4sAQADAgADdwADNQQ"))
     
     conn.close()
 

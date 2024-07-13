@@ -71,13 +71,10 @@ class Database:
     
     def get_user_data(self, attribute, user_id) -> object:
         with self.pg_conn.cursor() as cursor:
-            cursor.execute(f"""SELECT %s FROM users WHERE user_id = %s;""", (attribute, user_id))
+            cursor.execute(f"""SELECT {attribute} FROM users WHERE user_id = %s;""", (user_id,))
             data = cursor.fetchone()
         
-        if (data is None) or (data[0] is None): # value = None if user_id not found 
-            raise ValueError(f"DB: not found a value\nget_user_data(self, {attribute=}, {user_id=})")
-        else:
-            return data[0]
+        return data[0]
     
     def get_stock_models(self):
         cache_key = "models"
@@ -133,9 +130,6 @@ class Database:
                 
                 good_data_dict = dict(good_data)
                 
-                # Handle photo object as it cannot be directly stored in redis
-                good_data_dict["photo"] = b64encode(good_data_dict["photo"].tobytes()).decode('utf-8')
-                
                 self.redis_conn.set(cache_key, json.dumps(good_data_dict))
                 return good_data_dict
     
@@ -149,11 +143,15 @@ class Database:
     def redis_updater(self, redis_config, pg_config, is_in_production): 
         import psycopg2
         import redis
-        import select
         from time import sleep
         import traceback
         from datetime import datetime
-                
+        import select
+
+        def clear_redis_db(redis_client):
+            redis_client.flushdb()
+            print(f"All Redis keys cleared - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
         while True:
             try:
                 with redis.StrictRedis(
@@ -161,37 +159,37 @@ class Database:
                     port=redis_config["port"],
                     db=redis_config["db"],
                     decode_responses=True
-                    ) as redis_client:
-                    with psycopg2.connect(
+                ) as redis_client:
+                    pg_conn = psycopg2.connect(
                         dbname=pg_config["dbname"],
                         user=pg_config["user"],
                         password=pg_config["password"],
                         host=pg_config["host"],
                         port=pg_config["port"]
-                        ) as pg_conn:
-                        
-                        pg_conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
-                        
-                        def clear_redis_db():
-                            redis_client.flushdb()
-                            print(f"All Redis keys cleared - {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}")
-                        
-                        with pg_conn.cursor() as cur:
-                            cur.execute("LISTEN table_change;")
-                        
-                        clear_redis_db()
-                        print("Start listening for table changes...")
-                        while True:
-                            if select.select([pg_conn], [], [], None) == ([], [], []):
-                                print("ERROR\nselect.select([conn], [], [], None) == ([], [], [])")
-                            else:
-                                pg_conn.poll()
-                                while pg_conn.notifies:
-                                    notify = pg_conn.notifies.pop(0)
-                                    if not is_in_production: print(f"Table changed: {notify.payload} - {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}")
-                                    clear_redis_db()
-                                    break  # Ensure we only clear once per batch of notifications
+                    )
+                    pg_conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
+
+                    with pg_conn.cursor() as cur:
+                        cur.execute("LISTEN table_change;")
+
+                    clear_redis_db(redis_client)
+                    print("Start listening for table changes...")
+
+                    while True:
+                        if select.select([pg_conn], [], [], None) == ([], [], []):
+                            print("ERROR\nselect.select([conn], [], [], None) == ([], [], [])")
+                        else:
+                            pg_conn.poll()
+                            while pg_conn.notifies:
+                                notify = pg_conn.notifies.pop(0)
+                                if not is_in_production: print(f"Table changed: {notify.payload} - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+                                clear_redis_db(redis_client)
+            
             except Exception:
-                error = "ERROR\nRedis_updater:\n" + str(traceback.format_exc())
+                error = "ERROR\nRedis_updater:\n" + traceback.format_exc()
                 print(error)
-                sleep(600)
+                sleep(60)
+
+
+if __name__ == "__main__":
+    Database()

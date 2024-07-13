@@ -1,6 +1,5 @@
 import asyncio
 import json
-from os import path
 import traceback
 
 from telegram import (
@@ -18,9 +17,6 @@ from telegram.ext import (
 )
 
 
-from base64 import b64decode
-from io import BytesIO
-
 import database
 import keyboards as kb
 import config
@@ -35,15 +31,11 @@ async def try_msg_delete(chat_id, context, message_id=None, db_attrib = None, us
             message_id = db.get_user_data(db_attrib, user_id)
             if message_id == -1:
                 return False
-            await context.bot.delete_message(chat_id=chat_id, message_id = message_id)
         
-        elif message_id is not None:
-            await context.bot.delete_message(chat_id=chat_id, message_id = message_id)
-        else:
-            print(f"ERROR\n:WRONG try_msg_delete params:\n{chat_id=}, {context=}, {message_id=}, {db_attrib =}, {user_id =}")
-        
+        await context.bot.delete_message(chat_id=chat_id, message_id = message_id)
         return True
-    except:
+    except Exception as e:
+        print(e)
         return False
 
 
@@ -113,7 +105,7 @@ async def button_callback_handler(update: Update, context: CallbackContext) -> N
         
         msg = await context.bot.send_photo(
             chat_id=chat_id,
-            photo=BytesIO(b64decode(good_data["photo"])),
+            photo=good_data["photo"],
             caption=message_text,
             reply_markup = kb.good_card(good_data["model"]),
             disable_notification=True,
