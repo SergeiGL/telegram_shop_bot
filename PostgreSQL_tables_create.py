@@ -15,10 +15,31 @@ if __name__ == "__main__":
 
     conn.autocommit = True
     cursor = conn.cursor()
-
+    
+    def drop_all_tables():
+        cursor.execute("""
+            SELECT tablename
+            FROM pg_tables
+            WHERE schemaname = 'public';
+        """)
+        
+        tables = cursor.fetchall()
+        
+        if not tables:
+            print("No tables")
+            return
+        
+        drop_query = "DROP TABLE IF EXISTS {} CASCADE;".format(
+            ', '.join([f'"{table[0]}"' for table in tables]))
+        
+        cursor.execute(drop_query)
+    
+    drop_all_tables()
+    
+    
     cursor.execute(
         """CREATE TABLE IF NOT EXISTS users(
-                tg_id BIGINT PRIMARY KEY NOT NULL,
+                user_id BIGINT PRIMARY KEY NOT NULL,
                 chat_id BIGINT NOT NULL,
                 username VARCHAR(100) NOT NULL,
                 
@@ -26,7 +47,6 @@ if __name__ == "__main__":
                 
                 msg_id_with_kb BIGINT DEFAULT -1 NOT NULL
                 );""")
-    
     
     cursor.execute(
         """CREATE TABLE IF NOT EXISTS supplier_prices (
@@ -114,7 +134,29 @@ if __name__ == "__main__":
             AND (tgr.tgname IS NULL OR tgr.tgname !~ '^RI_ConstraintTrigger')
         ORDER BY 
             tbl.schemaname, tbl.tablename, tgr.tgname;""")
-    print(tabulate(cursor.fetchall()))
+    print(tabulate(cursor.fetchall())+ "\n\n\n")
+    
+    
+    cursor.execute(
+        """
+        SELECT 
+            tbl.schemaname AS schema_name,
+            tbl.tablename AS table_name,
+            tgr.tgname AS trigger_name
+        FROM 
+            pg_tables tbl
+        LEFT JOIN 
+            pg_class cl ON cl.relname = tbl.tablename
+        LEFT JOIN 
+            pg_trigger tgr ON tgr.tgrelid = cl.oid
+        LEFT JOIN 
+            pg_namespace nsp ON cl.relnamespace = nsp.oid
+        WHERE 
+            tbl.schemaname NOT IN ('pg_catalog', 'information_schema')
+        ORDER BY 
+            tbl.schemaname, tbl.tablename, tgr.tgname;""")
+    print(tabulate(cursor.fetchall())+ "\n\n\n")
+    
     
     cursor.close()
     conn.close()

@@ -29,19 +29,22 @@ from tg import send_telegram_message
 
 
 
-async def try_msg_delete(chat_id, message_id, context):
+async def try_msg_delete(chat_id, context, message_id=None, db_attrib = None, user_id = None):
     try:
-        await context.bot.delete_message(chat_id=chat_id, message_id = message_id)
+        if db_attrib and user_id and message_id is None:
+            message_id = db.get_user_data(db_attrib, user_id)
+            if message_id == -1:
+                return False
+            await context.bot.delete_message(chat_id=chat_id, message_id = message_id)
+        
+        elif message_id is not None:
+            await context.bot.delete_message(chat_id=chat_id, message_id = message_id)
+        else:
+            print(f"ERROR\n:WRONG try_msg_delete params:\n{chat_id=}, {context=}, {message_id=}, {db_attrib =}, {user_id =}")
+        
         return True
-    except: return False
-
-
-async def db_msg_delete(what_to_delete, user_id, chat_id, context):
-    msg_id_to_delete = db.get_attribute(from_="users", value=user_id, select = what_to_delete)
-    
-    if msg_id_to_delete != -1:
-        if await try_msg_delete(chat_id, msg_id_to_delete, context): 
-            db.set_user_attribute(tg_id = user_id, key = what_to_delete, value = -1)
+    except:
+        return False
 
 
 
@@ -50,7 +53,7 @@ async def db_msg_delete(what_to_delete, user_id, chat_id, context):
 async def start_handle(update: Update, context: CallbackContext) -> None:
     async def register_user_if_not_exist(user, user_id: int, chat_id: int):
         db.add_new_user_if_not_exist(
-            tg_id = user_id,
+            user_id = user_id,
             chat_id = chat_id,
             username=user.username or "Unknown")
     
@@ -59,17 +62,15 @@ async def start_handle(update: Update, context: CallbackContext) -> None:
     
     await register_user_if_not_exist(user = update.effective_user , user_id = user_id, chat_id=chat_id)
     
-    await db_msg_delete("msg_id_with_kb", user_id, chat_id, context)
+    await try_msg_delete(db_attrib="msg_id_with_kb", user_id=user_id, chat_id=chat_id, context=context)
     
     msg = await context.bot.send_animation(
                                 chat_id=chat_id,
-                                animation=PATH_TO_MENU_ANIMATION,
+                                animation=MENU_ANIMATION,
                                 reply_markup= kb.start_menu(),
                                 disable_notification=True,
                                 parse_mode = "HTML")
-    db.set_user_attribute(tg_id=user_id, key = "msg_id_with_kb", value = msg.id) # sets last message with kb
-
-
+    db.set_user_attribute(user_id=user_id, key="msg_id_with_kb", value=msg.id) # sets last message with kb
 
 
 async def button_callback_handler(update: Update, context: CallbackContext) -> None:
@@ -98,7 +99,7 @@ async def button_callback_handler(update: Update, context: CallbackContext) -> N
         await query.edit_message_reply_markup(reply_markup=kb.stock_versions(model, db.get_stock_versions(model)))
     
     elif (model := callback.get("gd_mdl")) and (version := callback.get("gd_vsn")):
-        if not await try_msg_delete(chat_id=chat_id, message_id = message_id, context=context):
+        if not await try_msg_delete(chat_id=chat_id, message_id=message_id, context=context):
             await query.edit_message_reply_markup(reply_markup=None)
         
         good_data = db.get_good_data(model=model, version=version)
@@ -117,21 +118,20 @@ async def button_callback_handler(update: Update, context: CallbackContext) -> N
             reply_markup = kb.good_card(good_data["model"]),
             disable_notification=True,
             parse_mode = "HTML")
-        db.set_user_attribute(tg_id=user_id, key = "msg_id_with_kb", value = msg.id) # sets last message with kb
+        db.set_user_attribute(user_id=user_id, key="msg_id_with_kb", value=msg.id) # sets last message with kb
     
     elif from_ == "good" and to_ == "vers":
         model = callback["modl"]
-        if not await try_msg_delete(chat_id=chat_id, message_id = message_id, context=context):
+        if not await try_msg_delete(chat_id=chat_id, message_id=message_id, context=context):
             await query.edit_message_reply_markup(reply_markup=None)
         
         msg = await context.bot.send_animation(
                 chat_id=chat_id,
-                animation=PATH_TO_MENU_ANIMATION,
+                animation=MENU_ANIMATION,
                 reply_markup = kb.stock_versions(model, db.get_stock_versions(model)),
                 disable_notification=True,
                 parse_mode = "HTML")
-        db.set_user_attribute(tg_id=user_id, key = "msg_id_with_kb", value = msg.id) # sets last message with kb
-
+        db.set_user_attribute(user_id=user_id, key="msg_id_with_kb", value=msg.id) # sets last message with kb
     else:
         if not config.production: print(f"Unknown button: from_ {from_}, to {to_}")
 
@@ -165,8 +165,9 @@ async def error_handle(update: Update, context: CallbackContext) -> None:
 
 
 
-PATH_TO_MENU_ANIMATION = path.join("assets", "logo_animation.gif")
+# PATH_TO_MENU_ANIMATION = path.join("assets", "logo_animation.gif")
 
+MENU_ANIMATION = "CgACAgIAAxkDAAICkmaSvdRHrrGITg15ikjErQPaXzlNAAJ5WAACAdSZSLtS2JsfVHdhNQQ"
 db = database.Database()
 
 if __name__ == "__main__":

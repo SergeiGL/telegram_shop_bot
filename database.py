@@ -46,40 +46,38 @@ class Database:
         
         print("Connections closed")
     
-    def add_new_user_if_not_exist(self, tg_id: int, chat_id: int, username: str):
-        with self.pg_conn.cursor() as cursor:
-            cursor.execute("""SELECT EXISTS (SELECT 1 FROM users WHERE tg_id = %s) AS user_exists;""", (tg_id, ))
-            
-            if not cursor.fetchone()[0]: # True or False depending on whether user exusts or not
-                cursor.execute(
-                        """INSERT INTO users (
-                                tg_id,
-                                chat_id,
-                                username
-                                ) VALUES (%s, %s, %s);""", (tg_id, chat_id, validate_text(username)))
     
-    
-    def set_user_attribute(self, tg_id: int, key: str, value) -> None:
+    def add_new_user_if_not_exist(self, user_id: int, chat_id: int, username: str):
         with self.pg_conn.cursor() as cursor:
             cursor.execute(
-                        f"""UPDATE users
-                            SET {key} = %s
-                            WHERE tg_id = %s;""", (value, tg_id))
+                """INSERT INTO users (
+                        user_id,
+                        chat_id,
+                        username
+                        ) VALUES (%s, %s, %s) ON CONFLICT (user_id) DO NOTHING;""", (user_id, chat_id, validate_text(username)))
+    
+    
+    def set_user_attribute(self, user_id: int, key, value) -> None:
+        with self.pg_conn.cursor() as cursor:
+            cursor.execute(f"""UPDATE users
+                                SET {key} = %s 
+                                WHERE user_id = %s;""",
+                            (value, user_id))
             affected_rows = cursor.rowcount
         
         if affected_rows == 0:
-            raise ValueError(f"DB: error in setting value\nset_user_attribute(self, {tg_id}: int, {key}: str, {value}: Any)")
+            raise ValueError(f"DB: error in setting value\nset_user_attribute(self, {user_id=}, {key=}, {value=}")
     
     
-    def get_attribute(self, select: str, from_: str, value: int, where: str = "tg_id") -> object:
+    def get_user_data(self, attribute, user_id) -> object:
         with self.pg_conn.cursor() as cursor:
-            cursor.execute(f"""SELECT {select} FROM {from_} WHERE {where} = %s;""", (value, ))
-            value = cursor.fetchone()
+            cursor.execute(f"""SELECT %s FROM users WHERE user_id = %s;""", (attribute, user_id))
+            data = cursor.fetchone()
         
-        if (value is None) or (value[0] is None): # value = None if tg_id not found 
-            raise ValueError(f"DB: not found a value\nget_attribute(self, {from_}: str, {value}: int, {select}: str)")
+        if (data is None) or (data[0] is None): # value = None if user_id not found 
+            raise ValueError(f"DB: not found a value\nget_user_data(self, {attribute=}, {user_id=})")
         else:
-            return value[0]
+            return data[0]
     
     def get_stock_models(self):
         cache_key = "models"
@@ -146,6 +144,8 @@ class Database:
             cursor.execute("INSERT INTO errors(error) VALUES (%s);", (validate_text(error_text), ))
     
     
+    
+    
     def redis_updater(self, redis_config, pg_config, is_in_production): 
         import psycopg2
         import redis
@@ -179,6 +179,7 @@ class Database:
                         with pg_conn.cursor() as cur:
                             cur.execute("LISTEN table_change;")
                         
+                        clear_redis_db()
                         print("Start listening for table changes...")
                         while True:
                             if select.select([pg_conn], [], [], None) == ([], [], []):
