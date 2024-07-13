@@ -102,19 +102,19 @@ async def button_callback_handler(update: Update, context: CallbackContext) -> N
         return
     
     elif from_ in ["menu", "vers"] and to_ == "stock":
-        await query.edit_message_reply_markup(reply_markup=kb.stock_models(db.get_models_in_stock()))
+        await query.edit_message_reply_markup(reply_markup=kb.stock_models(db.get_stock_models()))
 
     elif from_ == "stock" and to_ == "menu":
         await query.edit_message_reply_markup(reply_markup=kb.start_menu())
 
     elif model := callback.get("model"):
-        await query.edit_message_reply_markup(reply_markup=kb.stock_versions(model, db.get_versions_in_stock(model)))
+        await query.edit_message_reply_markup(reply_markup=kb.stock_versions(model, db.get_stock_versions(model)))
     
     elif (model := callback.get("gd_mdl")) and (version := callback.get("gd_vsn")):
         if not await try_msg_delete(chat_id=chat_id, message_id = message_id, context=context):
             await query.edit_message_reply_markup(reply_markup=None)
         
-        good_data = db.get_good_data(model=model, version=version, user_id=user_id)
+        good_data = db.get_good_data(model=model, version=version)
         if good_data == False:
             await start_handle(update, context)
             return
@@ -140,7 +140,7 @@ async def button_callback_handler(update: Update, context: CallbackContext) -> N
         msg = await context.bot.send_animation(
                 chat_id=chat_id,
                 animation=PATH_TO_MENU_ANIMATION,
-                reply_markup = kb.stock_versions(model, db.get_versions_in_stock(model)),
+                reply_markup = kb.stock_versions(model, db.get_stock_versions(model)),
                 disable_notification=True,
                 parse_mode = "HTML")
         db.set_user_attribute(tg_id=user_id, key = "msg_id_with_kb", value = msg.id) # sets last message with kb

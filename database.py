@@ -1,6 +1,8 @@
 import psycopg2
 from psycopg2.extras import DictCursor
 import config
+import redis
+import json
 
 
 def validate_text(text):
@@ -9,12 +11,19 @@ def validate_text(text):
 
 class Database:
     def __init__(self):
+        self.redis = redis.StrictRedis(
+                host=config.redis_config["host"], 
+                port=config.redis_config["port"], 
+                db=config.redis_config["db"],
+                decode_responses=True  # Ensures that Redis will return a string (instead of bytes)
+            )
+        
         self.conn = psycopg2.connect(
-                host = config.db_config["host"],
-                dbname = config.db_config["dbname"],
-                user = config.db_config["user"],
-                password = config.db_config["password"],
-                port = config.db_config["port"],
+                host = config.pg_config["host"],
+                dbname = config.pg_config["dbname"],
+                user = config.pg_config["user"],
+                password = config.pg_config["password"],
+                port = config.pg_config["port"],
             )
         
         self.conn.autocommit = True
@@ -58,19 +67,37 @@ class Database:
         else:
             return value[0]
     
-    def get_models_in_stock(self):
-        with self.conn.cursor() as cursor:
-            cursor.execute("""SELECT DISTINCT model from goods WHERE quantity_in_stock > 0 ORDER BY model""")
-            res = cursor.fetchall()
-            return [model for (model,) in res]
+    def get_stock_models(self):
+        cache_key = "get_stock_models"
+        
+        cached_result = self.redis.get(cache_key)
+        if cached_result:
+            return json.loads(cached_result)
+        else:
+            print("DB request")
+            with self.conn.cursor() as cursor:
+                cursor.execute("""SELECT DISTINCT model from goods WHERE quantity_in_stock > 0 ORDER BY model""")
+                res = cursor.fetchall()
+                models = [model for (model,) in res]
+                self.redis.set(cache_key, json.dumps(models))
+                return models
     
-    def get_versions_in_stock(self, model):
-        with self.conn.cursor() as cursor:
-            cursor.execute("""SELECT version from goods WHERE quantity_in_stock > 0 AND model = %s ORDER BY version""", (model, ))
-            res = cursor.fetchall()
-            return [vers for (vers,) in res]
+    def get_stock_versions(self, model):
+        cache_key = f"get_stock_versions{model}"
+        
+        cached_result = self.redis.get(cache_key)
+        if cached_result:
+            return json.loads(cached_result)
+        else:
+            print("DB request")
+            with self.conn.cursor() as cursor:
+                cursor.execute("""SELECT version from goods WHERE quantity_in_stock > 0 AND model = %s ORDER BY version""", (model, ))
+                res = cursor.fetchall()
+                versions = [vers for (vers,) in res]
+                self.redis.set(cache_key, json.dumps(versions))
+                return versions
     
-    def get_good_data(self, model : str, version: str, user_id):
+    def get_good_data(self, model : str, version: str):
         with self.conn.cursor(cursor_factory=DictCursor) as cursor:
             cursor.execute("""
                 SELECT g.specification_name, g.model, g.version, g.description, g.photo, sp.price_USD, sp.margin_order,

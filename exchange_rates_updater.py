@@ -12,11 +12,11 @@ from fake_useragent import UserAgent
 
 def update_rates_in_sql(rates_dict: dict) -> list[tuple]:
     conn = psycopg2.connect(
-            host = config.db_config['host'],
-            dbname = config.db_config['dbname'],
-            user = config.db_config['user'],
-            password = config.db_config['password'],
-            port = config.db_config['port'],
+            host = config.pg_config['host'],
+            dbname = config.pg_config['dbname'],
+            user = config.pg_config['user'],
+            password = config.pg_config['password'],
+            port = config.pg_config['port'],
             )
     conn.autocommit = True
     
