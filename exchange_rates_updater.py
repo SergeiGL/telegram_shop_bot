@@ -110,6 +110,7 @@ def update_exchange_rate_thread():
     scheduler.start()
 
 
+
 if __name__ == "__main__":
     update_exchange_rate()
     sleep(120)

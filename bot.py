@@ -27,10 +27,12 @@ from tg import send_telegram_message
 
 async def try_msg_delete(chat_id, context, message_id=None, db_attrib = None, user_id = None):
     try:
-        if db_attrib and user_id and message_id is None:
-            message_id = db.get_user_data(db_attrib, user_id)
+        if db_attrib=="msg_id_with_kb" and user_id and message_id is None:
+            message_id = db.get_msg_id_with_kb(user_id)
             if message_id == -1:
                 return False
+        elif db_attrib is not None:
+            print(f"WTF is this {db_attrib=} in try_msg_delete")
         
         await context.bot.delete_message(chat_id=chat_id, message_id = message_id)
         return True
@@ -43,8 +45,8 @@ async def try_msg_delete(chat_id, context, message_id=None, db_attrib = None, us
 # /start special entry function
 # THE WHOLE CODE IS BUILD WITH THE ASSUMPTION THAT THE USER WILL START FROM HERE
 async def start_handle(update: Update, context: CallbackContext) -> None:
-    async def register_user_if_not_exist(user, user_id: int, chat_id: int):
-        db.add_new_user_if_not_exist(
+    async def register_user(user, user_id: int, chat_id: int):
+        db.add_new_user(
             user_id = user_id,
             chat_id = chat_id,
             username=user.username or "Unknown")
@@ -52,7 +54,7 @@ async def start_handle(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
     
-    await register_user_if_not_exist(user = update.effective_user , user_id = user_id, chat_id=chat_id)
+    await register_user(user = update.effective_user , user_id = user_id, chat_id=chat_id)
     
     await try_msg_delete(db_attrib="msg_id_with_kb", user_id=user_id, chat_id=chat_id, context=context)
     
@@ -62,7 +64,7 @@ async def start_handle(update: Update, context: CallbackContext) -> None:
                                 reply_markup= kb.start_menu(),
                                 disable_notification=True,
                                 parse_mode = "HTML")
-    db.set_user_attribute(user_id=user_id, key="msg_id_with_kb", value=msg.id) # sets last message with kb
+    db.set_msg_with_kb(user_id=user_id, value=msg.id) # sets last message with kb
 
 
 async def button_callback_handler(update: Update, context: CallbackContext) -> None:
@@ -86,7 +88,7 @@ async def button_callback_handler(update: Update, context: CallbackContext) -> N
 
     elif from_ == "stock" and to_ == "menu":
         await query.edit_message_reply_markup(reply_markup=kb.start_menu())
-
+    
     elif model := callback.get("model"):
         await query.edit_message_reply_markup(reply_markup=kb.stock_versions(model, db.get_stock_versions(model)))
     
@@ -110,7 +112,7 @@ async def button_callback_handler(update: Update, context: CallbackContext) -> N
             reply_markup = kb.good_card(good_data["model"]),
             disable_notification=True,
             parse_mode = "HTML")
-        db.set_user_attribute(user_id=user_id, key="msg_id_with_kb", value=msg.id) # sets last message with kb
+        db.set_msg_with_kb(user_id=user_id, value=msg.id) # sets last message with kb
     
     elif from_ == "good" and to_ == "vers":
         model = callback["modl"]
@@ -123,7 +125,7 @@ async def button_callback_handler(update: Update, context: CallbackContext) -> N
                 reply_markup = kb.stock_versions(model, db.get_stock_versions(model)),
                 disable_notification=True,
                 parse_mode = "HTML")
-        db.set_user_attribute(user_id=user_id, key="msg_id_with_kb", value=msg.id) # sets last message with kb
+        db.set_msg_with_kb(user_id=user_id, value=msg.id) # sets last message with kb
     else:
         if not config.production: print(f"Unknown button: from_ {from_}, to {to_}")
 
