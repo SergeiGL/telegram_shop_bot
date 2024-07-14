@@ -1,7 +1,11 @@
 import psycopg2
 import redis
 from psycopg2.extras import DictCursor
-import config
+from config import (
+    redis_conf_keys,
+    pg_conf_keys,
+    is_in_production
+)
 import json
 import multiprocessing
 
@@ -15,24 +19,24 @@ def validate_text(text):
 class Database:
     def __init__(self):
         self.redis_conn = redis.StrictRedis(
-                host=config.redis_config["host"], 
-                port=config.redis_config["port"], 
-                db=config.redis_config["db"],
+                host=redis_conf_keys["host"], 
+                port=redis_conf_keys["port"], 
+                db=redis_conf_keys["db"],
                 decode_responses=True)  # Ensures that Redis will return a string (instead of bytes)
         
         self.redis_updater_process = multiprocessing.Process(
             target=self.redis_updater,
-            args=(config.redis_config, config.pg_config, config.production)
+            args=(redis_conf_keys, pg_conf_keys, is_in_production)
             )
         self.redis_updater_process.start()
         
         
         self.pg_conn = psycopg2.connect(
-                host = config.pg_config["host"],
-                dbname = config.pg_config["dbname"],
-                user = config.pg_config["user"],
-                password = config.pg_config["password"],
-                port = config.pg_config["port"])
+                host = pg_conf_keys["host"],
+                dbname = pg_conf_keys["dbname"],
+                user = pg_conf_keys["user"],
+                password = pg_conf_keys["password"],
+                port = pg_conf_keys["port"])
         self.pg_conn.autocommit = True
 
         prepared_statements = [
@@ -109,7 +113,7 @@ class Database:
         if cached_result:
             return json.loads(cached_result)
         else:
-            if not config.production: print("DB request")
+            if not is_in_production: print("DB request")
             with self.pg_conn.cursor() as cursor:
                 cursor.execute("""EXECUTE get_stock_models;""")
                 res = cursor.fetchall()
@@ -124,7 +128,7 @@ class Database:
         if cached_result:
             return json.loads(cached_result)
         else:
-            if not config.production: print("DB request")
+            if not is_in_production: print("DB request")
             with self.pg_conn.cursor() as cursor:
                 cursor.execute("""EXECUTE get_stock_versions (%s);""", (model, ))
                 res = cursor.fetchall()
@@ -139,7 +143,7 @@ class Database:
         if cached_result:
             return json.loads(cached_result)
         else:
-            if not config.production: print("DB request")
+            if not is_in_production: print("DB request")
             with self.pg_conn.cursor(cursor_factory=DictCursor) as cursor:
                 cursor.execute("""EXECUTE get_good_data (%s, %s);""", (model, version))
                 good_data = cursor.fetchone()

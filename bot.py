@@ -19,13 +19,17 @@ from telegram.ext import (
 
 import database
 import keyboards as kb
-import config
 from tg import send_telegram_message
+from config import (
+    telegram_bot_token,
+    is_in_production
+)
 
 
 
 
-async def try_msg_delete(chat_id, context, message_id=None, db_attrib = None, user_id = None):
+
+async def try_msg_delete(chat_id, context, query = None, message_id=None, db_attrib = None, user_id = None):
     try:
         if db_attrib=="msg_id_with_kb" and user_id and message_id is None:
             message_id = db.get_msg_id_with_kb(user_id)
@@ -37,7 +41,8 @@ async def try_msg_delete(chat_id, context, message_id=None, db_attrib = None, us
         await context.bot.delete_message(chat_id=chat_id, message_id = message_id)
         return True
     except Exception as e:
-        print(e)
+        if not is_in_production: print(e)
+        if query is not None: await query.edit_message_reply_markup(reply_markup=None)
         return False
 
 
@@ -56,7 +61,7 @@ async def start_handle(update: Update, context: CallbackContext) -> None:
     
     await register_user(user = update.effective_user , user_id = user_id, chat_id=chat_id)
     
-    await try_msg_delete(db_attrib="msg_id_with_kb", user_id=user_id, chat_id=chat_id, context=context)
+    await try_msg_delete(db_attrib="msg_id_with_kb", user_id=user_id, chat_id=chat_id, query=update.callback_query, context=context)
     
     msg = await context.bot.send_animation(
                                 chat_id=chat_id,
@@ -88,19 +93,18 @@ async def button_callback_handler(update: Update, context: CallbackContext) -> N
 
     elif from_ == "stock" and to_ == "menu":
         await query.edit_message_reply_markup(reply_markup=kb.start_menu())
-    
+
     elif model := callback.get("model"):
         await query.edit_message_reply_markup(reply_markup=kb.stock_versions(model, db.get_stock_versions(model)))
     
     elif (model := callback.get("gd_mdl")) and (version := callback.get("gd_vsn")):
-        if not await try_msg_delete(chat_id=chat_id, message_id=message_id, context=context):
-            await query.edit_message_reply_markup(reply_markup=None)
-        
         good_data = db.get_good_data(model=model, version=version)
         if good_data == False:
             await start_handle(update, context)
             return
         
+        await try_msg_delete(chat_id=chat_id, message_id=message_id, query=query, context=context)
+            
         message_text = f"<b>{good_data["model"]+ " "+ good_data["version"]}\n\n" + \
                         f"Цена: {int(round( good_data["price_usd"]*good_data["exch_rate"]*(1+good_data["margin_order"]/100), -2 )):,} RUB</b>\n\n" + \
                         good_data["description"]
@@ -116,8 +120,7 @@ async def button_callback_handler(update: Update, context: CallbackContext) -> N
     
     elif from_ == "good" and to_ == "vers":
         model = callback["modl"]
-        if not await try_msg_delete(chat_id=chat_id, message_id=message_id, context=context):
-            await query.edit_message_reply_markup(reply_markup=None)
+        await try_msg_delete(chat_id=chat_id, message_id=message_id, query=query, context=context)
         
         msg = await context.bot.send_animation(
                 chat_id=chat_id,
@@ -127,7 +130,7 @@ async def button_callback_handler(update: Update, context: CallbackContext) -> N
                 parse_mode = "HTML")
         db.set_msg_with_kb(user_id=user_id, value=msg.id) # sets last message with kb
     else:
-        if not config.production: print(f"Unknown button: from_ {from_}, to {to_}")
+        if not is_in_production: print(f"Unknown button: from_ {from_}, to {to_}")
 
 
 
@@ -149,7 +152,7 @@ async def error_handle(update: Update, context: CallbackContext) -> None:
     error = "ERROR\nbot.py:\n" + str(traceback.format_exc())
     print(error)
     try:
-        if config.production: send_telegram_message(error)
+        if is_in_production: send_telegram_message(error)
         db.insert_error(error)
     except: pass
     await start_handle(update, context)
@@ -167,7 +170,7 @@ db = database.Database()
 if __name__ == "__main__":
     application = (
         ApplicationBuilder()
-        .token(config.telegram_bot_token)
+        .token(telegram_bot_token)
         .concurrent_updates(True)
         .rate_limiter(AIORateLimiter(max_retries=5))
         .http_version("1.1")

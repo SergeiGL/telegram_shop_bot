@@ -6,11 +6,11 @@ description = '💰 Актуальная цена\n(обновляется еж�
 
 if __name__ == "__main__":
     conn = psycopg2.connect(
-            host = config.pg_config['host'],
-            dbname = config.pg_config['dbname'],
-            user = config.pg_config['user'],
-            password = config.pg_config['password'],
-            port = config.pg_config['port'],
+            host = config.pg_conf_keys['host'],
+            dbname = config.pg_conf_keys['dbname'],
+            user = config.pg_conf_keys['user'],
+            password = config.pg_conf_keys['password'],
+            port = config.pg_conf_keys['port'],
             )
     
     conn.autocommit = True

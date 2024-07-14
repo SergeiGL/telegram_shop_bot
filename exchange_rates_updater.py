@@ -1,7 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
 import psycopg2
-import config
+from config import pg_conf_keys, is_in_production
 from time import sleep
 from tg import send_telegram_message
 from apscheduler.schedulers.background import BlockingScheduler
@@ -12,11 +12,11 @@ from fake_useragent import UserAgent
 
 def update_rates_in_sql(rates_dict: dict) -> list[tuple]:
     conn = psycopg2.connect(
-            host = config.pg_config['host'],
-            dbname = config.pg_config['dbname'],
-            user = config.pg_config['user'],
-            password = config.pg_config['password'],
-            port = config.pg_config['port'],
+            host = pg_conf_keys['host'],
+            dbname = pg_conf_keys['dbname'],
+            user = pg_conf_keys['user'],
+            password = pg_conf_keys['password'],
+            port = pg_conf_keys['port'],
             )
     conn.autocommit = True
     
@@ -83,7 +83,7 @@ def update_exchange_rate() -> None:
         send_telegram_message("<b>UPDATE:\nSQL EXCHANGE RATES</b>\n\n" + "\n".join(f"{action}: {value}" for action, value in saved_rates))
     
     except Exception:
-        if config.production: 
+        if is_in_production: 
             send_telegram_message("<b>ERROR:\nSQL EXCHANGE RATES</b>\n\n" + str(traceback.format_exc()))
         else: print(str(traceback.format_exc()))
 
