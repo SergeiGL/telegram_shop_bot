@@ -8,7 +8,10 @@ from config import (
 )
 import json
 import multiprocessing
-
+    
+import numpy as np
+from io import BytesIO
+import matplotlib.pyplot as plt
 
 
 
@@ -30,6 +33,7 @@ class Database:
             )
         self.redis_updater_process.start()
         
+        self.cache_pricetable_img_key = "orderbook_img"
         
         self.pg_conn = psycopg2.connect(
                 host = pg_conf_keys["host"],
@@ -155,6 +159,43 @@ class Database:
                 
                 self.redis_conn.set(cache_key, json.dumps(good_data_dict))
                 return good_data_dict
+    
+    def set_pricetable_img_file_id(self, img_file_id) -> None:
+        if not is_in_production: print("redis set")
+        self.redis_conn.set(self.cache_pricetable_img_key, json.dumps(img_file_id))
+    
+    def get_pricetable_img(self):
+        cached_result = self.redis_conn.get(self.cache_pricetable_img_key)
+        if cached_result:
+            return json.loads(cached_result)
+        else:
+            if not is_in_production: print("DB request")
+            def create_image(spec_names, consumer_prices):
+                fig, ax = plt.subplots()
+                ax.axis('off')
+                table = ax.table(cellText=list(zip(spec_names, consumer_prices)),
+                                colLabels=['specification_name', 'consumer_order_price'],
+                                cellLoc='center', loc='center')
+                table.auto_set_font_size(False)
+                table.set_fontsize(8)
+                table.scale(1, 1.5)
+                
+                buffer = BytesIO()
+                plt.savefig(buffer, format='png', dpi=300, bbox_inches='tight')
+                plt.close(fig)
+                return buffer.getvalue()
+
+            with self.pg_conn.cursor() as cur:
+                cur.execute("""
+                    SELECT sp.specification_name, sp.price_usd, sp.margin_order, er.exch_rate
+                    FROM supplier_prices sp
+                    CROSS JOIN (SELECT exch_rate FROM exchange_rates WHERE pair = 'BUY USDT') er
+                """)
+                data = cur.fetchall()
+            
+            spec_names, prices, margins, rates = zip(*data)
+            consumer_prices = np.round(np.array(prices) * np.array(rates) * (1 + np.array(margins) / 100), -2).astype(int)
+            return create_image(list(spec_names), list(consumer_prices))
     
     def insert_error(self, error_text: str):
         with self.pg_conn.cursor() as cursor:

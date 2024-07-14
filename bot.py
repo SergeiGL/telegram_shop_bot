@@ -49,23 +49,21 @@ async def try_msg_delete(chat_id, context, query = None, message_id=None, db_att
 
 # /start special entry function
 # THE WHOLE CODE IS BUILD WITH THE ASSUMPTION THAT THE USER WILL START FROM HERE
-async def start_handle(update: Update, context: CallbackContext) -> None:
-    async def register_user(user, user_id: int, chat_id: int):
-        db.add_new_user(
-            user_id = user_id,
-            chat_id = chat_id,
-            username=user.username or "Unknown")
-    
+async def start_handle(update: Update, context: CallbackContext, create_user = True) -> None:
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
     
-    await register_user(user = update.effective_user , user_id = user_id, chat_id=chat_id)
+    if create_user:
+        db.add_new_user(
+            user_id=user_id,
+            chat_id=chat_id,
+            username=update.effective_user.username or "Unknown")
     
     await try_msg_delete(db_attrib="msg_id_with_kb", user_id=user_id, chat_id=chat_id, query=update.callback_query, context=context)
     
     msg = await context.bot.send_animation(
                                 chat_id=chat_id,
-                                animation=MENU_ANIMATION,
+                                animation=MENU_ANIM_FILE_ID,
                                 reply_markup= kb.start_menu(),
                                 disable_notification=True,
                                 parse_mode = "HTML")
@@ -124,11 +122,31 @@ async def button_callback_handler(update: Update, context: CallbackContext) -> N
         
         msg = await context.bot.send_animation(
                 chat_id=chat_id,
-                animation=MENU_ANIMATION,
+                animation=MENU_ANIM_FILE_ID,
                 reply_markup = kb.stock_versions(model, db.get_stock_versions(model)),
                 disable_notification=True,
                 parse_mode = "HTML")
         db.set_msg_with_kb(user_id=user_id, value=msg.id) # sets last message with kb
+    
+    elif from_ == "menu" and to_ == "order":
+        await try_msg_delete(chat_id=chat_id, message_id=message_id, query=query, context=context)
+        
+        pricetable_img = db.get_pricetable_img()
+        msg = await context.bot.send_photo(
+            chat_id=chat_id,
+            photo=pricetable_img,
+            caption="Out order prices",
+            reply_markup = kb.pricetable(),
+            disable_notification=True,
+            parse_mode = "HTML")
+        db.set_msg_with_kb(user_id=user_id, value=msg.id) # sets last message with kb
+        
+        if isinstance(pricetable_img, bytes):
+            db.set_pricetable_img_file_id(msg.photo[-1].file_id)
+    
+    elif from_ == "pricetable" and to_ == "start":
+        await start_handle(update, context, create_user = False)
+    
     else:
         if not is_in_production: print(f"Unknown button: from_ {from_}, to {to_}")
 
@@ -164,7 +182,7 @@ async def error_handle(update: Update, context: CallbackContext) -> None:
 
 # PATH_TO_MENU_ANIMATION = path.join("assets", "logo_animation.gif")
 
-MENU_ANIMATION = "CgACAgIAAxkDAAICkmaSvdRHrrGITg15ikjErQPaXzlNAAJ5WAACAdSZSLtS2JsfVHdhNQQ"
+MENU_ANIM_FILE_ID = "CgACAgIAAxkDAAICkmaSvdRHrrGITg15ikjErQPaXzlNAAJ5WAACAdSZSLtS2JsfVHdhNQQ"
 db = database.Database()
 
 if __name__ == "__main__":

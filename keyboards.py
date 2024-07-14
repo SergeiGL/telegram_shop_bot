@@ -8,7 +8,7 @@ from json import dumps
 def start_menu():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("Товар в Наличии", callback_data=dumps({"from": "menu", "to": "stock"}))],
-        [InlineKeyboardButton("Товар под Заказ", callback_data=dumps({"from": "menu", "to": "order"}))]
+        [InlineKeyboardButton("Заказать Товар", callback_data=dumps({"from": "menu", "to": "order"}))]
     ])
 
 
@@ -54,4 +54,10 @@ def good_card(model: str):
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("Купить", url='t.me/best_tech_shop')],
         [InlineKeyboardButton("Назад", callback_data=dumps({"from": "good", "to": "vers", "modl" : model}))],
+        ])
+
+def pricetable():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("Заказать", url='t.me/best_tech_shop')],
+        [InlineKeyboardButton("Назад", callback_data=dumps({"from": "pricetable", "to": "start"}))],
         ])
