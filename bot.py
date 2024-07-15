@@ -55,10 +55,7 @@ async def start_handle(update: Update, context: CallbackContext, create_user = T
     chat_id = update.effective_chat.id
     
     if create_user:
-        db.add_new_user(
-            user_id=user_id,
-            chat_id=chat_id,
-            username=update.effective_user.username or "Unknown")
+        db.add_new_user(user_id, chat_id=chat_id, username=update.effective_user.username or "Unknown")
     
     await try_msg_delete(db_attrib="msg_id_with_kb", user_id=user_id, chat_id=chat_id, query=update.callback_query, context=context)
     
