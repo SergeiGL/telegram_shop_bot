@@ -22,7 +22,8 @@ import keyboards as kb
 from tg import send_telegram_message
 from config import (
     telegram_bot_token,
-    is_in_production
+    is_in_production,
+    order_description_text
 )
 
 
@@ -102,10 +103,10 @@ async def button_callback_handler(update: Update, context: CallbackContext) -> N
             return
         
         await try_msg_delete(chat_id=chat_id, message_id=message_id, query=query, context=context)
-            
-        message_text = f"<b>{good_data["model"]+ " "+ good_data["version"]}\n\n" + \
-                        f"Цена: {int(round( good_data["price_usd"]*good_data["exch_rate"]*(1+good_data["margin_order"]/100), -2 )):,} RUB</b>\n\n" + \
-                        good_data["description"]
+        
+        message_text = f"<b>{good_data["specification_name"]}\n\n" + \
+                        f"{int(round( good_data["price_usd"]*good_data["exch_rate"]*(1+good_data["margin_order"]/100), -2 )):,} RUB</b>\n" \
+                        + good_data["description"]
         
         msg = await context.bot.send_photo(
             chat_id=chat_id,
@@ -135,7 +136,7 @@ async def button_callback_handler(update: Update, context: CallbackContext) -> N
         msg = await context.bot.send_photo(
             chat_id=chat_id,
             photo=pricetable_img,
-            caption="Out order prices",
+            caption=order_description_text,
             reply_markup = kb.pricetable(),
             disable_notification=True,
             parse_mode = "HTML")

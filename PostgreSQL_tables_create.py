@@ -1,10 +1,24 @@
 import psycopg2
 import config
 from tabulate import tabulate
+from random import randint
+
+is_drop_all_tables = True
+is_set_tables = True
+
+
+good_description = """
+💰 Актуальная цена\n(обновляется ежедневно)\n
+✅ Только ОРИГИНАЛЬНАЯ и НОВАЯ техника\n
+📍Самовывоз: 1 мин от метро "Москва Сити" и "Деловой Центр"\n
+<code class="text">1-й Красногвардейский проезд, 22с1</code>\n
+🚚 Доставка: Любая курьерская служба\n(100% предоплата)\n
+✈️ Экспресс доставка по Москве и МО в день заказа\n
+🛒Жмите "Купить"\n⏱Ответим за 2 минуты!"""
+
 
 
 if __name__ == "__main__":
-    
     conn = psycopg2.connect(
                     host = config.pg_conf_keys['host'],
                     dbname = config.pg_conf_keys['dbname'],
@@ -16,7 +30,7 @@ if __name__ == "__main__":
     conn.autocommit = True
     cursor = conn.cursor()
     
-    def drop_all_tables():
+    if is_drop_all_tables:
         cursor.execute("""
             SELECT tablename
             FROM pg_tables
@@ -27,14 +41,11 @@ if __name__ == "__main__":
         
         if not tables:
             print("No tables")
-            return
-        
-        drop_query = "DROP TABLE IF EXISTS {} CASCADE;".format(
-            ', '.join([f'"{table[0]}"' for table in tables]))
-        
-        cursor.execute(drop_query)
-    
-    drop_all_tables()
+        else:
+            drop_query = "DROP TABLE IF EXISTS {} CASCADE;".format(
+                ', '.join([f'"{table[0]}"' for table in tables]))
+            
+            cursor.execute(drop_query)
     
     
     cursor.execute(
@@ -158,6 +169,32 @@ if __name__ == "__main__":
             tbl.schemaname, tbl.tablename, tgr.tgname;""")
     print(tabulate(cursor.fetchall())+ "\n\n\n")
     
+    if is_set_tables:
+        cursor.execute("""
+                INSERT INTO exchange_rates (pair, exch_rate)
+                VALUES (%s, %s)
+                ON CONFLICT (pair) DO UPDATE SET exch_rate = EXCLUDED.exch_rate;""", ("BUY USDT", 100))
+            
+        for model in ["iPhone 15", "iPhone 14"]:
+            for version in ["256GB ⬜", "512GB ⬛", "PRO 256GB ⬜", "PRO 512GB ⬛"]:
+                specification_name = model + " " + version
+                cursor.execute(
+                    """INSERT INTO supplier_prices(
+                            specification_name,
+                            price_usd)
+                            VALUES (%s, %s) ON CONFLICT (specification_name) DO NOTHING;""", (specification_name, randint(200, 1000)))
+                
+                cursor.execute(
+                    """INSERT INTO goods(
+                        specification_name,
+                        model,
+                        version,
+                        description,
+                        quantity_in_stock,
+                        photo)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (specification_name) DO NOTHING;""", (specification_name, model, version, good_description, 1 , \
+                    "AgACAgIAAxkDAAICsmaSy6tKQVNlmjxRrOoxKpvMKHksAALA5DEbtAOYSCe9BcUYgO4sAQADAgADdwADNQQ"))
     
     cursor.close()
     conn.close()

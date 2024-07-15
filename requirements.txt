@@ -8,3 +8,5 @@ beautifulsoup4
 apscheduler
 lxml
 tabulate
+plotly
+kaleido

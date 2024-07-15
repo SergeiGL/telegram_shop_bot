@@ -9,9 +9,8 @@ from config import (
 import json
 import multiprocessing
     
-import numpy as np
 from io import BytesIO
-import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 
 
 
@@ -44,37 +43,52 @@ class Database:
         self.pg_conn.autocommit = True
 
         prepared_statements = [
-            "PREPARE add_new_user AS INSERT INTO users ( \
-                        user_id, \
-                        chat_id, \
-                        username \
-                        ) VALUES ($1, $2, $3) \
-                        ON CONFLICT (user_id) DO NOTHING;",
+            """PREPARE add_new_user AS INSERT INTO users ( \
+                    user_id, \
+                    chat_id, \
+                    username \
+                    ) VALUES ($1, $2, $3) \
+                    ON CONFLICT (user_id) DO NOTHING;""",
             
-            "PREPARE set_msg_with_kb AS UPDATE users \
-                        SET msg_id_with_kb = $1 \
-                        WHERE user_id = $2;",
+            """PREPARE set_msg_with_kb AS UPDATE users \
+                    SET msg_id_with_kb = $1 \
+                    WHERE user_id = $2;""",
             
-            "PREPARE get_msg_id_with_kb AS \
-                        SELECT msg_id_with_kb FROM users WHERE user_id = $1;",
+            """PREPARE get_msg_id_with_kb AS \
+                    SELECT msg_id_with_kb FROM users WHERE user_id = $1;""",
             
-            "PREPARE get_stock_models AS \
-                        SELECT DISTINCT model FROM goods WHERE quantity_in_stock > 0 ORDER BY model",
+            """PREPARE get_stock_models AS \
+                    SELECT DISTINCT model FROM goods WHERE quantity_in_stock > 0 \
+                    ORDER BY model;""",
             
-            "PREPARE get_stock_versions AS \
-                        SELECT version FROM goods \
-                        WHERE quantity_in_stock > 0 AND model = $1 ORDER BY version",
-                        
-            "PREPARE get_good_data AS \
-                        SELECT g.specification_name, g.model, g.version, g.description, g.photo, sp.price_USD, sp.margin_order, \
+            """PREPARE get_stock_versions AS \
+                    SELECT version FROM goods \
+                    WHERE quantity_in_stock > 0 AND model = $1 ORDER BY version;""",
+            
+            """PREPARE get_good_data AS \
+                    SELECT g.specification_name, g.model, g.version, g.description, g.photo, sp.price_USD, sp.margin_order, \
                         (SELECT exch_rate FROM exchange_rates WHERE pair = 'BUY USDT') AS exch_rate \
                     FROM goods g \
                     JOIN supplier_prices sp ON g.specification_name = sp.specification_name \
-                    WHERE g.model = $1 AND g.version = $2 AND g.quantity_in_stock > 0",
+                    WHERE g.model = $1 AND g.version = $2 AND g.quantity_in_stock > 0;""",
             
-            "PREPARE insert_error AS \
-                INSERT INTO errors(error) VALUES ($1);"
-        ]
+            """PREPARE insert_error AS \
+                INSERT INTO errors(error) VALUES ($1);""",
+            
+            """PREPARE get_pricetable_img AS \
+                SELECT 
+                    sp.specification_name,
+                    TO_CHAR(
+                        CEIL(sp.price_usd * (1 + sp.margin_order / 100) * er.exch_rate / 100.0) * 100, 
+                        'FM999,999,999'
+                    ) AS formatted_consumer_price
+                FROM 
+                    supplier_prices sp
+                JOIN 
+                    exchange_rates er 
+                    ON er.pair = 'BUY USDT';"""
+            ]
+        
         
         for prepared_statement in prepared_statements:
             with self.pg_conn.cursor() as cursor:
@@ -92,12 +106,12 @@ class Database:
     
     def add_new_user(self, user_id: int, chat_id: int, username: str):
         with self.pg_conn.cursor() as cursor:
-            cursor.execute("""EXECUTE add_new_user (%s, %s, %s);""", (user_id, chat_id, validate_text(username)))
+            cursor.execute("EXECUTE add_new_user (%s, %s, %s);", (user_id, chat_id, validate_text(username)))
     
     
     def set_msg_with_kb(self, user_id: int, value: int) -> None:
         with self.pg_conn.cursor() as cursor:
-            cursor.execute("""EXECUTE set_msg_with_kb (%s, %s);""", (value, user_id))
+            cursor.execute("EXECUTE set_msg_with_kb (%s, %s);", (value, user_id))
             affected_rows = cursor.rowcount
         
         if affected_rows == 0:
@@ -106,7 +120,7 @@ class Database:
     
     def get_msg_id_with_kb(self, user_id) -> int:
         with self.pg_conn.cursor() as cursor:
-            cursor.execute("""EXECUTE get_msg_id_with_kb (%s);""", (user_id, ))
+            cursor.execute("EXECUTE get_msg_id_with_kb (%s);", (user_id, ))
             data = cursor.fetchone()
         return data[0]
     
@@ -119,7 +133,7 @@ class Database:
         else:
             if not is_in_production: print("DB request")
             with self.pg_conn.cursor() as cursor:
-                cursor.execute("""EXECUTE get_stock_models;""")
+                cursor.execute("EXECUTE get_stock_models;")
                 res = cursor.fetchall()
                 models = [model for (model,) in res]
                 self.redis_conn.set(cache_key, json.dumps(models))
@@ -134,7 +148,7 @@ class Database:
         else:
             if not is_in_production: print("DB request")
             with self.pg_conn.cursor() as cursor:
-                cursor.execute("""EXECUTE get_stock_versions (%s);""", (model, ))
+                cursor.execute("EXECUTE get_stock_versions (%s);", (model, ))
                 res = cursor.fetchall()
                 versions = [vers for (vers,) in res]
                 self.redis_conn.set(cache_key, json.dumps(versions))
@@ -149,7 +163,7 @@ class Database:
         else:
             if not is_in_production: print("DB request")
             with self.pg_conn.cursor(cursor_factory=DictCursor) as cursor:
-                cursor.execute("""EXECUTE get_good_data (%s, %s);""", (model, version))
+                cursor.execute("EXECUTE get_good_data (%s, %s);", (model, version))
                 good_data = cursor.fetchone()
                 
                 if good_data is None:
@@ -161,7 +175,7 @@ class Database:
                 return good_data_dict
     
     def set_pricetable_img_file_id(self, img_file_id) -> None:
-        if not is_in_production: print("redis set")
+        if not is_in_production: print("Redis pricetable img is set")
         self.redis_conn.set(self.cache_pricetable_img_key, json.dumps(img_file_id))
     
     def get_pricetable_img(self):
@@ -170,32 +184,44 @@ class Database:
             return json.loads(cached_result)
         else:
             if not is_in_production: print("DB request")
-            def create_image(spec_names, consumer_prices):
-                fig, ax = plt.subplots()
-                ax.axis('off')
-                table = ax.table(cellText=list(zip(spec_names, consumer_prices)),
-                                colLabels=['specification_name', 'consumer_order_price'],
-                                cellLoc='center', loc='center')
-                table.auto_set_font_size(False)
-                table.set_fontsize(8)
-                table.scale(1, 1.5)
-                
-                buffer = BytesIO()
-                plt.savefig(buffer, format='png', dpi=300, bbox_inches='tight')
-                plt.close(fig)
-                return buffer.getvalue()
-
+            
             with self.pg_conn.cursor() as cur:
-                cur.execute("""
-                    SELECT sp.specification_name, sp.price_usd, sp.margin_order, er.exch_rate
-                    FROM supplier_prices sp
-                    CROSS JOIN (SELECT exch_rate FROM exchange_rates WHERE pair = 'BUY USDT') er
-                """)
+                cur.execute("EXECUTE get_pricetable_img;")
                 data = cur.fetchall()
             
-            spec_names, prices, margins, rates = zip(*data)
-            consumer_prices = np.round(np.array(prices) * np.array(rates) * (1 + np.array(margins) / 100), -2).astype(int)
-            return create_image(list(spec_names), list(consumer_prices))
+            if data == []:
+                models, prices = [],[]
+            else:
+                models, prices = zip(*data)
+            
+            cell_height = 25
+            header_height = cell_height+3
+            fig = go.Figure(data=[go.Table(
+                columnwidth=[2, 1],  # First column is twice as wide as the second
+                header=dict(
+                    values=['<b>Модель</b>', '<b>Цена, RUB</b>'],
+                    font=dict(color='#2a2a2a', size=14, family='Arial-Bold'),
+                    fill=dict(color='#ffffff'),
+                    height = header_height,
+                ),
+                cells=dict(
+                    values=[models, prices],
+                    fill=dict(color='#2a2a2a'),
+                    height = cell_height,
+                )
+            )])
+            
+            fig.update_layout(
+                template='plotly_dark',
+                margin={"l": 0, "r": 0, "t": 0, "b": 0},
+                width=450,
+                height = cell_height*len(models)+header_height,
+            )
+            
+            buffer = BytesIO()
+            fig.write_image(buffer, format='png', engine='kaleido')
+            return buffer.getvalue()
+    
     
     def insert_error(self, error_text: str):
         with self.pg_conn.cursor() as cursor:
