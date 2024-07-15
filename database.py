@@ -66,7 +66,7 @@ class Database:
                     WHERE quantity_in_stock > 0 AND model = $1 ORDER BY version;""",
             
             """PREPARE get_good_data AS \
-                    SELECT g.specification_name, g.model, g.version, g.description, g.photo, sp.price_USD, sp.margin_order, \
+                    SELECT g.specification_name, g.model, g.version, g.description, g.photo, sp.price_USD, sp.margin_stock, \
                         (SELECT exch_rate FROM exchange_rates WHERE pair = 'BUY USDT') AS exch_rate \
                     FROM goods g \
                     JOIN supplier_prices sp ON g.specification_name = sp.specification_name \
@@ -86,7 +86,8 @@ class Database:
                     supplier_prices sp
                 JOIN 
                     exchange_rates er 
-                    ON er.pair = 'BUY USDT';"""
+                    ON er.pair = 'BUY USDT'
+                ORDER BY sp.specification_name;"""
             ]
         
         

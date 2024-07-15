@@ -127,6 +127,36 @@ if __name__ == "__main__":
                     FOR EACH STATEMENT EXECUTE FUNCTION notify_table_change();""")
     except psycopg2.errors.DuplicateObject: pass
 
+    
+    if is_set_tables:
+        cursor.execute("""
+                INSERT INTO exchange_rates (pair, exch_rate)
+                VALUES (%s, %s)
+                ON CONFLICT (pair) DO UPDATE SET exch_rate = EXCLUDED.exch_rate;""", ("BUY USDT", 100))
+            
+        for model in ["iPhone 15", "iPhone 14"]:
+            for version in ["256GB ⬜", "512GB ⬛", "PRO 256GB ⬜", "PRO 512GB ⬛"]:
+                specification_name = model + " " + version
+                cursor.execute(
+                    """INSERT INTO supplier_prices(
+                            specification_name,
+                            price_usd)
+                            VALUES (%s, %s) ON CONFLICT (specification_name) DO NOTHING;""", (specification_name, randint(200, 1000)))
+                
+                cursor.execute(
+                    """INSERT INTO goods(
+                        specification_name,
+                        model,
+                        version,
+                        description,
+                        quantity_in_stock,
+                        photo)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (specification_name) DO NOTHING;""", (specification_name, model, version, good_description, 1 , \
+                    "AgACAgIAAxkDAAICsmaSy6tKQVNlmjxRrOoxKpvMKHksAALA5DEbtAOYSCe9BcUYgO4sAQADAgADdwADNQQ"))
+    
+    
+    
     cursor.execute(
         """
         SELECT 
@@ -169,32 +199,6 @@ if __name__ == "__main__":
             tbl.schemaname, tbl.tablename, tgr.tgname;""")
     print(tabulate(cursor.fetchall())+ "\n\n\n")
     
-    if is_set_tables:
-        cursor.execute("""
-                INSERT INTO exchange_rates (pair, exch_rate)
-                VALUES (%s, %s)
-                ON CONFLICT (pair) DO UPDATE SET exch_rate = EXCLUDED.exch_rate;""", ("BUY USDT", 100))
-            
-        for model in ["iPhone 15", "iPhone 14"]:
-            for version in ["256GB ⬜", "512GB ⬛", "PRO 256GB ⬜", "PRO 512GB ⬛"]:
-                specification_name = model + " " + version
-                cursor.execute(
-                    """INSERT INTO supplier_prices(
-                            specification_name,
-                            price_usd)
-                            VALUES (%s, %s) ON CONFLICT (specification_name) DO NOTHING;""", (specification_name, randint(200, 1000)))
-                
-                cursor.execute(
-                    """INSERT INTO goods(
-                        specification_name,
-                        model,
-                        version,
-                        description,
-                        quantity_in_stock,
-                        photo)
-                VALUES (%s, %s, %s, %s, %s, %s)
-                ON CONFLICT (specification_name) DO NOTHING;""", (specification_name, model, version, good_description, 1 , \
-                    "AgACAgIAAxkDAAICsmaSy6tKQVNlmjxRrOoxKpvMKHksAALA5DEbtAOYSCe9BcUYgO4sAQADAgADdwADNQQ"))
     
     cursor.close()
     conn.close()

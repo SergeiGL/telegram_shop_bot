@@ -102,7 +102,7 @@ async def button_callback_handler(update: Update, context: CallbackContext) -> N
         await try_msg_delete(chat_id=chat_id, message_id=message_id, query=query, context=context)
         
         message_text = f"<b>{good_data["specification_name"]}\n\n" + \
-                        f"{int(round( good_data["price_usd"]*good_data["exch_rate"]*(1+good_data["margin_order"]/100), -2 )):,} RUB</b>\n" \
+                        f"{int(round( good_data["price_usd"]*good_data["exch_rate"]*(1+good_data["margin_stock"]/100), -2 )):,} RUB</b>\n" \
                         + good_data["description"]
         
         msg = await context.bot.send_photo(
