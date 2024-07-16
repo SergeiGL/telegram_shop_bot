@@ -30,21 +30,18 @@ from config import (
 
 
 
-async def try_msg_delete(chat_id, context, query = None, message_id=None, db_attrib = None, user_id = None):
-    try:
-        if db_attrib=="msg_id_with_kb" and user_id and message_id is None:
-            message_id = db.get_msg_id_with_kb(user_id)
-            if message_id == -1:
-                return False
-        elif db_attrib is not None:
-            print(f"WTF is this {db_attrib=} in try_msg_delete")
-        
-        await context.bot.delete_message(chat_id=chat_id, message_id = message_id)
-        return True
-    except Exception as e:
-        if not is_in_production: print(e)
-        if query is not None: await query.edit_message_reply_markup(reply_markup=None)
-        return False
+async def try_msg_delete(del_msg_id, send_msg_id, chat_id, user_id, context, query):
+    if del_msg_id != -1:
+        try:
+            await context.bot.delete_message(chat_id=chat_id, message_id = del_msg_id)
+        except Exception as e:
+            if not is_in_production: print(e)
+            try:
+                if query is not None: await query.edit_message_reply_markup(reply_markup=None)
+            except: pass
+    
+    if send_msg_id is not None and user_id is not None:
+        db.set_msg_with_kb(user_id=user_id, value=send_msg_id) # sets last message with kb
 
 
 
@@ -57,15 +54,15 @@ async def start_handle(update: Update, context: CallbackContext, create_user = T
     if create_user:
         db.add_new_user(user_id, chat_id=chat_id, username=update.effective_user.username or "Unknown")
     
-    await try_msg_delete(db_attrib="msg_id_with_kb", user_id=user_id, chat_id=chat_id, query=update.callback_query, context=context)
     
-    msg = await context.bot.send_animation(
+    send_msg = await context.bot.send_animation(
                                 chat_id=chat_id,
                                 animation=MENU_ANIM_FILE_ID,
                                 reply_markup= kb.start_menu(),
                                 disable_notification=True,
                                 parse_mode = "HTML")
-    db.set_msg_with_kb(user_id=user_id, value=msg.id) # sets last message with kb
+    await try_msg_delete(db.get_msg_id_with_kb(user_id), send_msg.id, chat_id, user_id, context, update.callback_query)
+    
 
 
 async def button_callback_handler(update: Update, context: CallbackContext) -> None:
@@ -74,7 +71,7 @@ async def button_callback_handler(update: Update, context: CallbackContext) -> N
     
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
-    message_id = update.effective_message.id
+    msg_id = update.effective_message.id
     
     callback = json.loads(query.data)
     from_ = callback.get("from")
@@ -99,48 +96,43 @@ async def button_callback_handler(update: Update, context: CallbackContext) -> N
             await start_handle(update, context)
             return
         
-        await try_msg_delete(chat_id=chat_id, message_id=message_id, query=query, context=context)
-        
         message_text = f"<b>{good_data["specification_name"]}\n\n" + \
                         f"{int(round( good_data["price_usd"]*good_data["exch_rate"]*(1+good_data["margin_stock"]/100), -2 )):,} RUB</b>\n" \
                         + good_data["description"]
         
-        msg = await context.bot.send_photo(
+        send_msg = await context.bot.send_photo(
             chat_id=chat_id,
             photo=good_data["photo"],
             caption=message_text,
             reply_markup = kb.good_card(good_data["model"]),
             disable_notification=True,
             parse_mode = "HTML")
-        db.set_msg_with_kb(user_id=user_id, value=msg.id) # sets last message with kb
+        await try_msg_delete(msg_id, send_msg.id, chat_id, user_id, context, query)
     
     elif from_ == "good" and to_ == "vers":
         model = callback["modl"]
-        await try_msg_delete(chat_id=chat_id, message_id=message_id, query=query, context=context)
         
-        msg = await context.bot.send_animation(
+        send_msg = await context.bot.send_animation(
                 chat_id=chat_id,
                 animation=MENU_ANIM_FILE_ID,
                 reply_markup = kb.stock_versions(model, db.get_stock_versions(model)),
                 disable_notification=True,
                 parse_mode = "HTML")
-        db.set_msg_with_kb(user_id=user_id, value=msg.id) # sets last message with kb
+        await try_msg_delete(msg_id, send_msg.id, chat_id, user_id, context, query)
     
     elif from_ == "menu" and to_ == "order":
-        await try_msg_delete(chat_id=chat_id, message_id=message_id, query=query, context=context)
-        
         pricetable_img = db.get_pricetable_img()
-        msg = await context.bot.send_photo(
+        send_msg = await context.bot.send_photo(
             chat_id=chat_id,
             photo=pricetable_img,
             caption=order_description_text,
             reply_markup = kb.pricetable(),
             disable_notification=True,
             parse_mode = "HTML")
-        db.set_msg_with_kb(user_id=user_id, value=msg.id) # sets last message with kb
+        await try_msg_delete(msg_id, send_msg.id, chat_id, user_id, context, query)
         
         if isinstance(pricetable_img, bytes):
-            db.set_pricetable_img_file_id(msg.photo[-1].file_id)
+            db.set_pricetable_img_file_id(send_msg.photo[-1].file_id)
     
     elif from_ == "pricetable" and to_ == "start":
         await start_handle(update, context, create_user = False)
@@ -156,13 +148,14 @@ async def post_init(application: Application) -> None:
 
 async def message_handle(update: Update, context: CallbackContext) -> None:
     chat_id = update.effective_chat.id
-    message_id = update.effective_message.id
+    msg_id = update.effective_message.id
 
     # Сheck if message is edited (to avoid AttributeError: 'NoneType' object has no attribute 'from_user')
     if update.edited_message or update.message is None:
         return
     
-    await try_msg_delete(chat_id, message_id, context)
+    await try_msg_delete(msg_id, None, chat_id, None, context, query=None)
+
 
 async def error_handle(update: Update, context: CallbackContext) -> None:
     error = "ERROR\nbot.py:\n" + str(traceback.format_exc())

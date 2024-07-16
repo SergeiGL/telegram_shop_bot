@@ -55,6 +55,7 @@ if __name__ == "__main__":
                 username VARCHAR(100) NOT NULL,
                 
                 first_seen timestamptz DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                n_interractions BIGINT DEFAULT 1 NOT NULL,
                 
                 msg_id_with_kb BIGINT DEFAULT -1 NOT NULL
                 );""")

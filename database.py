@@ -50,8 +50,10 @@ class Database:
                     ) VALUES ($1, $2, $3) \
                     ON CONFLICT (user_id) DO NOTHING;""",
             
-            """PREPARE set_msg_with_kb AS UPDATE users \
-                    SET msg_id_with_kb = $1 \
+            """PREPARE set_msg_with_kb AS \
+                    UPDATE users \
+                    SET msg_id_with_kb = $1, \
+                    n_interractions = n_interractions+1
                     WHERE user_id = $2;""",
             
             """PREPARE get_msg_id_with_kb AS \
@@ -109,15 +111,9 @@ class Database:
         with self.pg_conn.cursor() as cursor:
             cursor.execute("EXECUTE add_new_user (%s, %s, %s);", (user_id, chat_id, validate_text(username)))
     
-    
     def set_msg_with_kb(self, user_id: int, value: int) -> None:
         with self.pg_conn.cursor() as cursor:
             cursor.execute("EXECUTE set_msg_with_kb (%s, %s);", (value, user_id))
-            affected_rows = cursor.rowcount
-        
-        if affected_rows == 0:
-            raise ValueError(f"DB: error in setting value\nset_user_attribute(self, {user_id=}, {value=}")
-    
     
     def get_msg_id_with_kb(self, user_id) -> int:
         with self.pg_conn.cursor() as cursor:
@@ -215,7 +211,7 @@ class Database:
             fig.update_layout(
                 template='plotly_dark',
                 margin={"l": 0, "r": 0, "t": 0, "b": 0},
-                width=450,
+                width=440,
                 height = cell_height*len(models)+header_height,
             )
             
