@@ -90,7 +90,7 @@ def update_exchange_rate() -> None:
 
 
 
-def update_exchange_rate_thread():
+def update_exchange_rate_scheduler():
     # Create an instance of BackgroundScheduler
     scheduler = BlockingScheduler()
 
@@ -99,7 +99,7 @@ def update_exchange_rate_thread():
     scheduler.add_job(update_exchange_rate, 
                         'cron', 
                         hour=23,
-                        minute=12,
+                        minute=0,
                         second=5,
                         max_instances=1,
                         coalesce=True,
@@ -108,10 +108,3 @@ def update_exchange_rate_thread():
 
     # Start the scheduler
     scheduler.start()
-
-
-
-if __name__ == "__main__":
-    update_exchange_rate()
-    sleep(120)
-    update_exchange_rate_thread()

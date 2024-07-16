@@ -3,8 +3,6 @@ import config
 from tabulate import tabulate
 from random import randint
 
-is_drop_all_tables = True
-is_set_tables = True
 
 
 good_description = """
@@ -30,7 +28,7 @@ if __name__ == "__main__":
     conn.autocommit = True
     cursor = conn.cursor()
     
-    if is_drop_all_tables:
+    if config.is_drop_all_tables:
         cursor.execute("""
             SELECT tablename
             FROM pg_tables
@@ -127,9 +125,9 @@ if __name__ == "__main__":
                     AFTER INSERT OR UPDATE OR DELETE ON exchange_rates
                     FOR EACH STATEMENT EXECUTE FUNCTION notify_table_change();""")
     except psycopg2.errors.DuplicateObject: pass
-
     
-    if is_set_tables:
+    
+    if config.is_set_tables:
         cursor.execute("""
                 INSERT INTO exchange_rates (pair, exch_rate)
                 VALUES (%s, %s)

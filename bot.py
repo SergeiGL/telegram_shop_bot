@@ -1,7 +1,7 @@
 import asyncio
 import json
 import traceback
-
+import multiprocessing
 from telegram import (
     Update
 )
@@ -176,7 +176,27 @@ async def error_handle(update: Update, context: CallbackContext) -> None:
 MENU_ANIM_FILE_ID = "CgACAgIAAxkDAAICkmaSvdRHrrGITg15ikjErQPaXzlNAAJ5WAACAdSZSLtS2JsfVHdhNQQ"
 db = database.Database()
 
+
+def run_exchange_rate_process():
+    from exchange_rates_updater import update_exchange_rate, update_exchange_rate_scheduler
+    
+    update_exchange_rate()
+    
+    from time import sleep
+    sleep(120)
+    
+    # Start the scheduled process
+    update_exchange_rate_scheduler()
+
+
+
 if __name__ == "__main__":
+    # Create a new process
+    update_exchange_rate_process = multiprocessing.Process(target=run_exchange_rate_process)
+    
+    # Start the process
+    update_exchange_rate_process.start()
+    
     application = (
         ApplicationBuilder()
         .token(telegram_bot_token)
@@ -195,3 +215,4 @@ if __name__ == "__main__":
 
 
     application.run_polling()
+    update_exchange_rate_process.join()
