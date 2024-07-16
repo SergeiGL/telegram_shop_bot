@@ -62,7 +62,6 @@ async def start_handle(update: Update, context: CallbackContext, create_user = T
                                 disable_notification=True,
                                 parse_mode = "HTML")
     await try_msg_delete(db.get_msg_id_with_kb(user_id), send_msg.id, chat_id, user_id, context, update.callback_query)
-    
 
 
 async def button_callback_handler(update: Update, context: CallbackContext) -> None:
@@ -215,4 +214,3 @@ if __name__ == "__main__":
 
 
     application.run_polling()
-    update_exchange_rate_process.join()
