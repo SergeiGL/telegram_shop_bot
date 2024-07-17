@@ -152,7 +152,7 @@ if __name__ == "__main__":
                         photo)
                 VALUES (%s, %s, %s, %s, %s, %s)
                 ON CONFLICT (specification_name) DO NOTHING;""", (specification_name, model, version, good_description, 1 , \
-                    "AgACAgIAAxkDAAICsmaSy6tKQVNlmjxRrOoxKpvMKHksAALA5DEbtAOYSCe9BcUYgO4sAQADAgADdwADNQQ"))
+                    config.pg_setter_good_picture))
     
     
     

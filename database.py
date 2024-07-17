@@ -41,6 +41,9 @@ class Database:
                 password = pg_conf_keys["password"],
                 port = pg_conf_keys["port"])
         self.pg_conn.autocommit = True
+        
+        self.update_exchange_rate_process = multiprocessing.Process(target=self.run_exchange_rate_process)
+        self.update_exchange_rate_process.start()
 
         prepared_statements = [
             """PREPARE add_new_user AS INSERT INTO users ( \
@@ -104,7 +107,10 @@ class Database:
         self.redis_updater_process.terminate()
         self.redis_updater_process.join()  # Wait for the process to actually terminate
         
-        print("Connections closed")
+        self.update_exchange_rate_process.terminate()
+        self.redis_updater_process.join()
+        
+        print("All connections closed")
     
     
     def add_new_user(self, user_id: int, chat_id: int, username: str):
@@ -276,6 +282,13 @@ class Database:
                 print(error)
                 sleep(600)
 
+    def run_exchange_rate_process(self):
+        from exchange_rates_updater import update_exchange_rate, update_exchange_rate_scheduler
+        from time import sleep
+        
+        update_exchange_rate()
+        sleep(120)
+        update_exchange_rate_scheduler()
 
 
 if __name__ == "__main__":
