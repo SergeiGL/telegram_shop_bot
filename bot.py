@@ -1,6 +1,7 @@
 import asyncio
 import json
 import traceback
+import sys
 from telegram import (
     Update
 )
@@ -157,12 +158,22 @@ async def message_handle(update: Update, context: CallbackContext) -> None:
 
 
 async def error_handle(update: Update, context: CallbackContext) -> None:
-    error = "ERROR\nbot.py:\n" + str(traceback.format_exc())
+    exc_info = sys.exc_info()
+
+    if exc_info[0] is None:
+        error_message = "ERROR\nbot.py:\nAn error occurred, but no exception was raised."
+    else:
+        tb_list = traceback.format_exception(*exc_info)
+        tb_string = ''.join(tb_list)
+        
+        error_message = f"ERROR\nbot.py:\n{tb_string}"
+    
     try:
-        if is_in_production: send_telegram_message(error)
-        else: print(error)
-        db.insert_error(error)
+        if is_in_production: send_telegram_message(error_message)
+        else: print(error_message)
+        db.insert_error(error_message)
     except: pass
+    
     await start_handle(update, context)
 
 

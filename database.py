@@ -15,7 +15,7 @@ import plotly.graph_objects as go
 
 
 def validate_text(text):
-    return text.replace("'", " ").replace('"', " ")
+    return text.replace("'", " ").replace('"', " ").replace(";", "")
 
 
 class Database:
