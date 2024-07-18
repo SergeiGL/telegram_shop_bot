@@ -75,7 +75,7 @@ async def button_callback_handler(update: Update, context: CallbackContext) -> N
     callback = json.loads(query.data)
     from_ = callback.get("from")
     to_ = callback.get("to")
-
+    
     
     if from_ == -1:
         return
@@ -138,7 +138,7 @@ async def button_callback_handler(update: Update, context: CallbackContext) -> N
     
     else:
         if not is_in_production: print(f"Unknown button: from_ {from_}, to {to_}")
-
+        await start_handle(update, context)
 
 
 
@@ -158,9 +158,9 @@ async def message_handle(update: Update, context: CallbackContext) -> None:
 
 async def error_handle(update: Update, context: CallbackContext) -> None:
     error = "ERROR\nbot.py:\n" + str(traceback.format_exc())
-    print(error)
     try:
         if is_in_production: send_telegram_message(error)
+        else: print(error)
         db.insert_error(error)
     except: pass
     await start_handle(update, context)
