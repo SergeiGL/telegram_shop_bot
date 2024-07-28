@@ -44,7 +44,7 @@ class Database:
         
         self.update_exchange_rate_process = multiprocessing.Process(target=self.run_exchange_rate_process)
         self.update_exchange_rate_process.start()
-
+        
         prepared_statements = [
             """PREPARE add_new_user AS INSERT INTO users ( \
                     user_id, \
@@ -63,19 +63,20 @@ class Database:
                     SELECT msg_id_with_kb FROM users WHERE user_id = $1;""",
             
             """PREPARE get_stock_models AS \
-                    SELECT DISTINCT model FROM goods WHERE quantity_in_stock > 0 \
+                    SELECT DISTINCT model FROM goods WHERE is_in_stock = true  \
                     ORDER BY model;""",
             
             """PREPARE get_stock_versions AS \
                     SELECT version FROM goods \
-                    WHERE quantity_in_stock > 0 AND model = $1 ORDER BY version;""",
+                    WHERE is_in_stock = true AND model = $1 \
+                    ORDER BY version;""",
             
             """PREPARE get_good_data AS \
                     SELECT g.specification_name, g.model, g.version, g.description, g.photo, sp.price_USD, sp.margin_stock, \
                         (SELECT exch_rate FROM exchange_rates WHERE pair = 'BUY USDT') AS exch_rate \
                     FROM goods g \
                     JOIN supplier_prices sp ON g.specification_name = sp.specification_name \
-                    WHERE g.model = $1 AND g.version = $2 AND g.quantity_in_stock > 0;""",
+                    WHERE g.model = $1 AND g.version = $2 AND g.is_in_stock = true;""",
             
             """PREPARE insert_error AS \
                 INSERT INTO errors(error) VALUES ($1);""",

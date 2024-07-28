@@ -71,17 +71,12 @@ if __name__ == "__main__":
                 specification_name VARCHAR(125) PRIMARY KEY,
                 model VARCHAR(25) NOT NULL,
                 version VARCHAR(25) NOT NULL,
-                quantity_in_stock INTEGER DEFAULT 0 NOT NULL,
+                is_in_stock BOOLEAN DEFAULT TRUE NOT NULL,
                 description VARCHAR(500) NOT NULL,
                 photo VARCHAR(255) NOT NULL,
                 FOREIGN KEY (specification_name) REFERENCES supplier_prices(specification_name),
                 UNIQUE (model, version)
                 );""")
-
-    cursor.execute("""CREATE INDEX IF NOT EXISTS idx_model ON goods (model);""")
-    cursor.execute("""CREATE INDEX IF NOT EXISTS idx_version ON goods (version);""")
-    cursor.execute("""CREATE INDEX IF NOT EXISTS idx_quantity_in_stock ON goods (quantity_in_stock);""")
-    
     
     cursor.execute(
         """CREATE TABLE IF NOT EXISTS exchange_rates(
@@ -96,6 +91,17 @@ if __name__ == "__main__":
                 error TEXT NOT NULL
                 );""")
 
+    
+    
+    cursor.execute("""CREATE INDEX IF NOT EXISTS idx_users_msg_id_with_kb ON users(msg_id_with_kb);""")
+    
+    cursor.execute("""CREATE INDEX IF NOT EXISTS idx_goods_is_in_stock ON goods(is_in_stock);""")
+    cursor.execute("""CREATE INDEX IF NOT EXISTS idx_goods_model ON goods(model);""")
+    cursor.execute("""CREATE INDEX IF NOT EXISTS idx_goods_model_version ON goods(model, version);""")
+    cursor.execute("""CREATE INDEX IF NOT EXISTS idx_goods_in_stock_model ON goods(is_in_stock, model);""")
+    
+    cursor.execute("""ANALYZE users, supplier_prices, goods, exchange_rates, errors;""")
+    
 # -- Create a function to notify changes
     cursor.execute(
         """CREATE OR REPLACE FUNCTION notify_table_change() RETURNS trigger AS $$
@@ -148,10 +154,10 @@ if __name__ == "__main__":
                         model,
                         version,
                         description,
-                        quantity_in_stock,
+                        is_in_stock,
                         photo)
                 VALUES (%s, %s, %s, %s, %s, %s)
-                ON CONFLICT (specification_name) DO NOTHING;""", (specification_name, model, version, good_description, 1 , \
+                ON CONFLICT (specification_name) DO NOTHING;""", (specification_name, model, version, good_description, True , \
                     config.pg_setter_good_picture))
     
     

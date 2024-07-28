@@ -39,9 +39,8 @@ def stock_versions(model: str, versions_in_stock: list[str]):
                                 InlineKeyboardButton(versions_list[-1], callback_data=dumps({"gd_mdl" : model, "gd_vsn" : versions_list[-1]})),
                                 InlineKeyboardButton(" ", callback_data=dumps({"from": -1}))
                                 ])
-
-        keyboard = [[InlineKeyboardButton(model, callback_data=dumps({"from": -1}))]]
         
+        keyboard = []
         convert_to_pairs(versions_in_stock, keyboard)
         
         keyboard.append([InlineKeyboardButton("Назад", callback_data=dumps({"from": "vers", "to" : "stock"}))])
