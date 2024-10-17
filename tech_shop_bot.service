@@ -1,0 +1,14 @@
+[Unit]
+Description=Tech Shop Bot Service
+After=network.target redis-server.service postgresql.service
+Wants=redis-server.service postgresql.service
+
+[Service]
+WorkingDirectory=/home/sergei/Documents/tech_shop_bot
+ExecStart=/bin/bash -c 'source bot_venv/bin/activate && exec python3 bot.py'
+Restart=on-failure
+RestartSec=5
+Environment="/home/sergei/Documents/tech_shop_bot/bot_venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin"
+
+[Install]
+WantedBy=multi-user.target

@@ -24,12 +24,13 @@ from config import (
     telegram_bot_token,
     is_in_production,
     order_description_text,
-    MENU_ANIM_FILE_ID
+    menu_anim_file_id
 )
 
 
 
-
+import os
+print(os.environ['PATH'])
 
 async def try_msg_delete(del_msg_id, send_msg_id, chat_id, user_id, context, query):
     if del_msg_id != -1:
@@ -58,7 +59,7 @@ async def start_handle(update: Update, context: CallbackContext, create_user = T
     
     send_msg = await context.bot.send_animation(
                                 chat_id=chat_id,
-                                animation=MENU_ANIM_FILE_ID,
+                                animation=menu_anim_file_id,
                                 reply_markup= kb.start_menu(),
                                 disable_notification=True,
                                 parse_mode = "HTML")
@@ -114,7 +115,7 @@ async def button_callback_handler(update: Update, context: CallbackContext) -> N
         
         send_msg = await context.bot.send_animation(
                 chat_id=chat_id,
-                animation=MENU_ANIM_FILE_ID,
+                animation=menu_anim_file_id,
                 reply_markup = kb.stock_versions(model, db.get_stock_versions(model)),
                 disable_notification=True,
                 parse_mode = "HTML")

@@ -93,7 +93,7 @@ class Database:
                 JOIN 
                     exchange_rates er 
                     ON er.pair = 'BUY USDT'
-                ORDER BY sp.specification_name;"""
+                ORDER BY formatted_consumer_price;"""
             ]
         
         
