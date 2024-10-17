@@ -1,18 +1,26 @@
 # [install]
+
 python3 -m venv create bot_venv
+
 pip install -r requirements.txt
 
 sudo cp tech_shop_bot.service /etc/systemd/system/
 
 sudo systemctl daemon-reload
+
 sudo systemctl enable tech_shop_bot.service
 
 # [before run]
+
 sudo systemctl status redis-server.service
+
 sudo systemctl status postgresql
+
 sudo systemctl status tech_shop_bot.service
 
+
 # [run]
+
 sudo systemctl start tech_shop_bot.service
 
 
