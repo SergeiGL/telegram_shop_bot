@@ -22,7 +22,7 @@ Before installation, ensure you have the following:
 ### 1. Set up the environment
 ```bash
 # Create virtual environment
-python3 -m venv create bot_venv
+python3 -m venv bot_venv
 
 # Activate virtual environment
 source bot_venv/bin/activate
